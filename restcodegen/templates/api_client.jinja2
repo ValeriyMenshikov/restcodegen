@@ -1,0 +1,215 @@
+# coding: utf-8
+{% include 'header.jinja2' %}
+
+{%- set service_name = service_name %}
+{%- set version = version %}
+{%- set api_name = api_name %}
+{%- set async_mode = async_mode %}
+
+from typing import Any
+from httpx import Response
+from typing import TypeVar, Generic
+{% if async_mode %}
+from restcodegen.rest_client.client_async import ApiClient
+{% else %}
+from restcodegen.rest_client.client_sync import ApiClient
+{% endif %}
+{% if models %}
+from clients.http.{{ service_name|to_snake_case }}.models.api_models import (
+    {% for model in models %}
+    {{ model }},
+    {% endfor %}
+)
+{% endif %}
+
+
+class {{ api_name|to_camel_case }}Api:
+
+    def __init__(self, api_client: ApiClient) -> None:
+        self.api_client = api_client
+
+    {%- for data in data_list %}
+    {%- set method = data.get('method') %}
+    {%- set path = data.get('path', None) %}
+    {%- set request_body = data.get('request_body') %}
+    {%- set summary = data.get('summary') %}
+    {%- set responses = data.get('responses') %}
+    {%- set success_response = responses.get('200', None) or responses.get('201', None) %}
+    {%- set query_parameters = data.get('query_parameters', None) %}
+    {%- set path_parameters = data.get('path_parameters', None) %}
+    {%- set headers = data.get('headers', None) %}
+    {%- set headers = headers|sort(attribute='required', reverse=True) %}
+
+    {% if async_mode %}async {% endif %}def {{ method }}_{{ path|to_snake_case }}(
+        self,
+        {%- if request_body %}
+        {{ request_body|to_snake_case }}: {{ request_body }}, # noqa: E501
+        {%- endif %}
+        {%- if path_parameters %}
+        {%- for path_param in path_parameters %}
+        {{ path_param.get('name')|to_snake_case }}: {{ path_param.get('type') }},
+        {%- endfor %}
+        {%- endif %}
+        {%- if query_parameters %}
+        {%- for query_param in query_parameters %}
+        {{ query_param.get('name')|to_snake_case }}: {{ query_param.get('type') }},
+        {%- endfor %}
+        {%- endif %}
+        {%- if headers %}
+        {%- for header in headers %}
+        {{ header.get('name')|to_snake_case }}: {{ header.get('type') }} {% if header.get('required') %}{% elif header.get('type') == 'str' %} = "" {% else %} = {{ header.get('default') }}{% endif %},
+        {%- endfor %}
+        {%- endif %}
+        **kwargs,
+    ) -> {{ success_response if success_response else 'Response' }}:
+        """
+        {{ summary.strip() | wordwrap(width=120) if summary else 'No summary description' }}.
+
+        Args:
+            {%- if request_body %}
+            {{ request_body|to_snake_case }}({{ request_body }}): ...
+            {%- endif %}
+            {%- if path_parameters %}
+            {%- for path_param in path_parameters %}
+            {{ path_param.get('name')|to_snake_case }}({{ path_param.get('type')}}{% if path_param.get('required')%}, required{% else %}, optional{% endif %}): {{ path_param.get('description', '') | wordwrap(width=50) if path_param.get('description') else '...' }}
+            {%- endfor %}
+            {%- endif %}
+            {%- if query_parameters %}
+            {%- for query_param in query_parameters %}
+            {{ query_param.get('name')|to_snake_case }}({{ query_param.get('type') }}{% if query_param.get('required')%}, required{% else %}, optional{% endif %}): {{ query_param.get('description', '') | wordwrap(width=50) if query_param.get('description') else '...' }}
+            {%- endfor %}
+            {%- endif %}
+            {%- if headers %}
+            {%- for header in headers %}
+            {{ header.get('name')|to_snake_case }}({{ header.get('type') }}{% if header.get('required')%}, required{% else %}, optional{% endif %}): {{ header.get('description', '')  | wordwrap(width=50) if header.get('description') else '...' }}
+            {%- endfor %}
+            {%- endif %}
+            **kwargs: аргументы поддерживаемые библиотекой httpx (data, files, headers и т.п.)
+
+        Returns:
+            {{ success_response if success_response else 'None' }}: ...
+        """  # noqa: D205,E501
+
+        response = {%- if async_mode %}await {% endif %}self.{{ method }}_{{ path|to_snake_case }}_with_http_info(
+            {%- if path_parameters %}
+            {%- for path_param in path_parameters %}
+            {{ path_param.get('name')|to_snake_case }}={{ path_param.get('name')|to_snake_case }},
+            {%- endfor %}
+            {%- endif %}
+            {%- if request_body %}
+            {{ request_body|to_snake_case }}={{ request_body|to_snake_case }}, # noqa: E501
+            {%- endif %}
+            {%- if query_parameters %}
+            {%- for query_param in query_parameters %}
+            {{ query_param.get('name')|to_snake_case }}={{ query_param.get('name')|to_snake_case }},
+            {%- endfor %}
+            {%- endif %}
+            {%- if headers %}
+            {%- for header in headers %}
+            {{ header.get('name')|to_snake_case }}={{ header.get('name')|to_snake_case }},
+            {%- endfor %}
+            {%- endif %}
+            **kwargs,
+        )
+        {%- if success_response %}
+        return {{ success_response }}.model_validate_json(response.text)
+        {%- else %}
+        return response
+        {%- endif %}
+
+
+    {% if async_mode %}async {% endif %}def {{ method }}_{{ path|to_snake_case }}_with_http_info(
+        self,
+        {%- if request_body %}
+        {{ request_body|to_snake_case }}: {{ request_body }}, # noqa: E501
+        {%- endif %}
+        {%- if path_parameters %}
+        {%- for path_param in path_parameters %}
+        {{ path_param.get('name')|to_snake_case }}: {{ path_param.get('type') }},
+        {%- endfor %}
+        {%- endif %}
+        {%- if query_parameters %}
+        {%- for query_param in query_parameters %}
+        {{ query_param.get('name')|to_snake_case }}: {{ query_param.get('type') }},
+        {%- endfor %}
+        {%- endif %}
+        {%- if headers %}
+        {%- for header in headers %}
+        {{ header.get('name')|to_snake_case }}: {{ header.get('type') }} {% if header.get('required') %}{% elif header.get('type') == 'str' %} = "" {% else %} = {{ header.get('default') }}{% endif %},
+        {%- endfor %}
+        {%- endif %}
+        **kwargs,
+    ) -> Response:
+        """
+        {{ summary.strip() | wordwrap(width=120) if summary else 'No summary description' }}.
+
+        Args:
+            {%- if request_body %}
+            {{ request_body|to_snake_case }}({{ request_body }}): ...
+            {%- endif %}
+            {%- if path_parameters %}
+            {%- for path_param in path_parameters %}
+            {{ path_param.get('name')|to_snake_case }}({{ path_param.get('type')}}{% if path_param.get('required')%}, required{% else %}, optional{% endif %}): {{ path_param.get('description', '') | wordwrap(width=50) if path_param.get('description') else '...' }}
+            {%- endfor %}
+            {%- endif %}
+            {%- if query_parameters %}
+            {%- for query_param in query_parameters %}
+            {{ query_param.get('name')|to_snake_case }}({{ query_param.get('type') }}{% if query_param.get('required')%}, required{% else %}, optional{% endif %}): {{ query_param.get('description', '') | wordwrap(width=50) if query_param.get('description') else '...' }}
+            {%- endfor %}
+            {%- endif %}
+            {%- if headers %}
+            {%- for header in headers %}
+            {{ header.get('name')|to_snake_case }}({{ header.get('type') }}{% if header.get('required')%}, required{% else %}, optional{% endif %}): {{ header.get('description', '')  | wordwrap(width=50) if header.get('description') else '...' }}
+            {%- endfor %}
+            {%- endif %}
+            **kwargs: аргументы поддерживаемые библиотекой httpx (data, files, headers и т.п.)
+
+        Returns:
+            Response: ...
+        """  # noqa: D205,E501
+        {%- if query_parameters %}
+        # process the query parameters
+        params_map = {
+            {%- for query_param in query_parameters %}
+            "{{ query_param.get('name') }}": {{ query_param.get('name')|to_snake_case }},
+            {%- endfor %}
+            }
+        params = {k: v for k, v in params_map.items() if v}
+        {%- endif %}
+
+        {%- if headers %}
+        # process the header parameters
+        headers_map = {
+            {%- for header in headers %}
+            "{{ header.get('name') }}": str({{ header.get('name')|to_snake_case }}),
+            {%- endfor %}
+        }
+        headers = {k: str(v) for k, v in headers_map.items() if v}
+
+        headers_from_kwargs = kwargs.pop("headers", {})
+        if headers_from_kwargs:
+            headers.update(headers_from_kwargs)
+        {%- else %}
+        headers = kwargs.pop("headers", {})
+        {%- endif %}
+
+        {% if request_body %}
+        data = {{ request_body|to_snake_case }}.model_dump_json(exclude_none=True, by_alias=True) # noqa: E501
+        headers.update({"Content-Type": "application/json"})
+        {%- endif %}
+
+        response = {% if async_mode %}await {% endif %}self.api_client.{{ method }}(
+            {%- if path %}
+            url=f"{{ path }}",
+            {%- endif %}
+            {%- if request_body %}
+            data=data,
+            {%- endif %}
+            {%- if query_parameters %}
+            params=params,
+            {%- endif %}
+            headers=headers,
+            **kwargs,
+        )
+        return response
+        {%- endfor %}

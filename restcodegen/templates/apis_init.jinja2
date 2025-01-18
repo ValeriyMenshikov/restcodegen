@@ -1,0 +1,11 @@
+{% include 'header.jinja2' %}
+{%- set api_names = api_names %}
+{%- for api_name in api_names %}
+from clients.http.{{ service_name|to_snake_case }}.apis.{{ api_name|to_snake_case }}_api import {{ api_name|to_camel_case }}Api
+{%- endfor %}
+
+__all__ = [
+    {%- for api_name in api_names %}
+    "{{ api_name|to_camel_case }}Api",
+    {%- endfor %}
+]
