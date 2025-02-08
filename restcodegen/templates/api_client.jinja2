@@ -8,7 +8,7 @@
 
 from typing import Any
 from httpx import Response
-from typing import TypeVar, Generic
+from typing import Any
 {% if async_mode %}
 from restcodegen.rest_client.client_async import ApiClient
 {% else %}
@@ -60,7 +60,7 @@ class {{ api_name|to_camel_case }}Api:
         {{ header.get('name')|to_snake_case }}: {{ header.get('type') }} {% if header.get('required') %}{% elif header.get('type') == 'str' %} = "" {% else %} = {{ header.get('default') }}{% endif %},
         {%- endfor %}
         {%- endif %}
-        **kwargs,
+        **kwargs: Any,
     ) -> {{ success_response if success_response else 'Response' }}:
         """
         {{ summary.strip() | wordwrap(width=120) if summary else 'No summary description' }}.

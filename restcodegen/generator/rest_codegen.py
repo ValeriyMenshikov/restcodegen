@@ -1,7 +1,6 @@
+import json
 from pathlib import Path
-from subprocess import (
-    SubprocessError,
-)
+from datamodel_code_generator import DataModelType, generate
 from typing import (
     Optional,
 )
@@ -84,25 +83,19 @@ class RESTClientGenerator(BaseTemplateGenerator):
             / "models"
             / "api_models.py"
         )
-        spec = (
-            self.openapi_spec.cache_spec_path
-            if is_url(self.openapi_spec.spec_path)
-            else self.openapi_spec.spec_path
-        )
         create_and_write_file(file_path=file_path)
         create_and_write_file(
             file_path=file_path.parent / "__init__.py", text="# coding: utf-8"
         )
-        header_path_template = str(self.templates_dir / "header.jinja2")
-        command = f"""datamodel-codegen \
-                    --input {spec} \
-                    --output {file_path} \
-                    --snake-case-field \
-                    --output-model-type pydantic_v2.BaseModel \
-                    --reuse-model \
-                    --field-constraints \
-                    --custom-file-header-path {header_path_template}\
-                    --capitalise-enum-members"""
-        exit_code, stderr = run_command(command)
-        if exit_code != 0:
-            raise SubprocessError(stderr)
+        header_path_template = self.templates_dir / "header.jinja2"
+        generate(
+            json.dumps(self.openapi_spec.openapi_spec),
+            output=file_path,
+            snake_case_field=True,
+            output_model_type=DataModelType.PydanticV2BaseModel,
+            reuse_model=True,
+            field_constraints=True,
+            custom_file_header_path=header_path_template,
+            capitalise_enum_members=True,
+            encoding="utf-8",
+        )
