@@ -200,7 +200,7 @@ class {{ api_name|to_camel_case }}Api:
 
         response = {% if async_mode %}await {% endif %}self.api_client.{{ method }}(
             {%- if path %}
-            url=f"{{ path }}",
+            path=f"{{ path }}",
             {%- endif %}
             {%- if request_body %}
             data=data,
