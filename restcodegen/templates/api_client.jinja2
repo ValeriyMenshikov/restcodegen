@@ -138,7 +138,7 @@ class {{ api_name|to_camel_case }}Api:
         {{ header.get('name')|to_snake_case }}: {{ header.get('type') }} {% if header.get('required') %}{% elif header.get('type') == 'str' %} = "" {% else %} = {{ header.get('default') }}{% endif %},
         {%- endfor %}
         {%- endif %}
-        **kwargs,
+        **kwargs: Any,
     ) -> Response:
         """
         {{ summary.strip() | wordwrap(width=120) if summary else 'No summary description' }}.
