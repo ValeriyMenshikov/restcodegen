@@ -55,6 +55,7 @@ class ApiClient:
         log.msg(
             event="Request",
             method=method,
+            path=path,
             host=self.host,
             params=kwargs.get("params"),
             headers=kwargs.get("headers"),
