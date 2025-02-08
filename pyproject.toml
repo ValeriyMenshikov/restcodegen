@@ -7,7 +7,7 @@ readme = "README.md"
 packages = [{ include = "restcodegen" }]
 
 [tool.poetry.dependencies]
-python = "^3.11"
+python = "^3.10"
 loguru = "^0.7.3"
 pydantic-settings = "^2.7.1"
 httpx = "^0.28.1"
