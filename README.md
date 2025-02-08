@@ -5,7 +5,7 @@ This tool enables testers to quickly create client libraries for interacting wit
 
 ## Installation
 
-To install, you need the required dependencies. Make sure you have Python 3.6 or higher installed.
+To install, you need the required dependencies. Make sure you have Python 3.10 or higher installed.
 
 ```bash
 pip install restcodegen
