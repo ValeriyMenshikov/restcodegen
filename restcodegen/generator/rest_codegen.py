@@ -9,9 +9,7 @@ from restcodegen.generator.base import BaseTemplateGenerator
 from restcodegen.generator.log import LOGGER
 from restcodegen.generator.parser import OpenAPISpec
 from restcodegen.generator.utils import (
-    is_url,
     create_and_write_file,
-    run_command,
 )
 from restcodegen.generator.utils import (
     name_to_snake,

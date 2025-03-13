@@ -126,7 +126,11 @@ class OpenAPISpec:
         except httpx.HTTPError:
             spec = {}
             LOGGER.warning(f"OpenAPI spec not available by url: {self.spec_path} ")
-            file_path = self.spec_path if Path(self.spec_path).is_file() else str(self.cache_spec_path)
+            file_path = (
+                self.spec_path
+                if Path(self.spec_path).is_file()
+                else str(self.cache_spec_path)
+            )
             if Path(file_path).is_file():
                 LOGGER.warning(f"Try open OpenAPI spec by path: {file_path}")
                 with open(file_path, "r") as f:

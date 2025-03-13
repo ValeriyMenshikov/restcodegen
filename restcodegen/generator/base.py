@@ -36,6 +36,8 @@ class BaseTemplateGenerator(BaseGenerator):
         super().__init__()
         self.templates_dir = templates_dir or TEMPLATES
         self.version = get_version()
-        self.env = Environment(loader=FileSystemLoader(self.templates_dir), autoescape=True)  # type: ignore
+        self.env = Environment(
+            loader=FileSystemLoader(self.templates_dir), autoescape=True
+        )  # type: ignore
         self.env.filters["to_snake_case"] = name_to_snake
         self.env.filters["to_camel_case"] = snake_to_camel

@@ -31,7 +31,7 @@ def snake_to_camel(string: str) -> str:
 def create_and_write_file(file_path: Path, text: Optional[str] = None) -> None:
     file_path.parent.mkdir(parents=True, exist_ok=True)
     if text:
-        file_path.write_text(text)
+        file_path.write_text(text, encoding="utf-8")
 
 
 def run_command(command: str) -> tuple[int, Optional[str]]:
@@ -41,7 +41,6 @@ def run_command(command: str) -> tuple[int, Optional[str]]:
 
 
 def format_file() -> None:
-    # LOGGER.info(f"Linting generated code at: {path}")
     command_format = [
         "ruff",
         "format",
