@@ -10,9 +10,9 @@ from typing import Any
 from httpx import Response
 from typing import Any
 {% if async_mode %}
-from restcodegen.rest_client.client_async import ApiClient
+from restcodegen.restclient import AsyncClient
 {% else %}
-from restcodegen.rest_client.client_sync import ApiClient
+from restcodegen.restclient import Client
 {% endif %}
 {% if models %}
 from clients.http.{{ service_name|to_snake_case }}.models.api_models import (
@@ -25,7 +25,7 @@ from clients.http.{{ service_name|to_snake_case }}.models.api_models import (
 
 class {{ api_name|to_camel_case }}Api:
 
-    def __init__(self, api_client: ApiClient) -> None:
+    def __init__(self, api_client: {% if async_mode %}AsyncClient{% else %}Client{% endif %}) -> None:
         self.api_client = api_client
 
     {%- for data in data_list %}
@@ -194,16 +194,16 @@ class {{ api_name|to_camel_case }}Api:
         {%- endif %}
 
         {% if request_body %}
-        data = {{ request_body|to_snake_case }}.model_dump_json(exclude_none=True, by_alias=True) # noqa: E501
+        content = {{ request_body|to_snake_case }}.model_dump_json(exclude_none=True, by_alias=True) # noqa: E501
         headers.update({"Content-Type": "application/json"})
         {%- endif %}
 
         response = {% if async_mode %}await {% endif %}self.api_client.{{ method }}(
             {%- if path %}
-            path=f"{{ path }}",
+            url=f"{{ path }}",
             {%- endif %}
             {%- if request_body %}
-            data=data,
+            content=content,
             {%- endif %}
             {%- if query_parameters %}
             params=params,

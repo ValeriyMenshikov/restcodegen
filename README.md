@@ -27,6 +27,7 @@ restcodegen generate -u "http://example.com/openapi.json" -s "my-service" -a fal
 - --url, -u: URL of the OpenAPI specification (required).
 - --service-name, -s: Name of the service (required).
 - --async-mode, -a: Flag to enable asynchronous client generation (default is false).
+- --api-tags, -t: Comma-separated list of API tags to generate (default is all APIs).
 ```
 
 ### Example
@@ -57,12 +58,11 @@ Structure:
 The generated API client includes built-in logging using `structlog`, which allows you to easily track API requests and responses. Additionally, instead of using the built-in `ApiClient`, you can provide your own HTTPX client for more customization.
 
 Here is an example of how to use the generated client:
+
 ```python
-from restcodegen.rest_client.client_sync import ApiClient
-from restcodegen.rest_client.configuration import Configuration
+from restcodegen.restclient import Client, Configuration
 from clients.http.petstore import PetApi
 import structlog
-
 
 structlog.configure(
     processors=[
@@ -75,7 +75,7 @@ structlog.configure(
 
 if __name__ == '__main__':
     configuration = Configuration(host="https://petstore3.swagger.io/api/v3")
-    api_client = ApiClient(configuration)  # You can replace this with your custom client
+    api_client = Client(configuration)  # You can replace this with your custom httpx client
     # apiclient = httpx.AsyncClient()  # Uncomment if using a custom HTTPX client
     pet_api = PetApi(api_client)
     response = pet_api.get_pet_pet_id(pet_id=1)
