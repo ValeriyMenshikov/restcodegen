@@ -76,4 +76,3 @@ def get_version() -> str:
             return dep["version"]
     return "unknown"
 
-get_version()
