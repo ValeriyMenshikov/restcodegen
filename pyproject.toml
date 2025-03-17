@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "restcodegen"
-version = "1.0.0"
+version = "1.0.1"
 description = ""
 authors = ["Menshikov Valeriy Sergeevich <vmenshikov@ozon.ru>"]
 readme = "README.md"

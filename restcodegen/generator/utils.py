@@ -1,4 +1,5 @@
 import importlib.metadata
+import pprint
 import re
 from functools import cache
 from pathlib import Path
@@ -69,7 +70,10 @@ def get_dependencies() -> list[dict[str, str]]:
 @cache
 def get_version() -> str:
     deps = get_dependencies()
+    pprint.pprint(deps)
     for dep in deps:
         if dep["path"] == "restcodegen":
             return dep["version"]
     return "unknown"
+
+get_version()
