@@ -75,3 +75,5 @@ def get_version() -> str:
         if dep["path"] == "restcodegen":
             return dep["version"]
     return "unknown"
+
+get_version()
