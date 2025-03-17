@@ -8,6 +8,7 @@ from typing import (
 from restcodegen.generator.base import BaseTemplateGenerator
 from restcodegen.generator.log import LOGGER
 from restcodegen.generator.parser import OpenAPISpec
+from restcodegen.generator.patcher import ClientModelPatcher
 from restcodegen.generator.utils import (
     create_and_write_file,
 )
@@ -28,11 +29,21 @@ class RESTClientGenerator(BaseTemplateGenerator):
         super().__init__(templates_dir=templates_dir)
         self.openapi_spec = openapi_spec
         self.async_mode = async_mode
+        self._patcher = ClientModelPatcher(
+            models_path=self.BASE_PATH
+            / name_to_snake(openapi_spec.service_name)
+            / "models"
+            / "api_models.py",
+            client_path=self.BASE_PATH
+            / name_to_snake(openapi_spec.service_name)
+            / "apis",
+        )
 
     def generate(self) -> None:
         self._gen_clients()
         self._gen_init_apis()
         self._gen_models()
+        self._patcher.patch_client_files()
 
     def _gen_init_apis(self) -> None:
         LOGGER.info("Generate __init__.py for apis")
