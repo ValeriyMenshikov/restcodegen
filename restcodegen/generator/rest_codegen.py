@@ -107,5 +107,4 @@ class RESTClientGenerator(BaseTemplateGenerator):
             custom_file_header_path=header_path_template,
             capitalise_enum_members=True,
             encoding="utf-8",
-            use_title_as_name=True,
         )
