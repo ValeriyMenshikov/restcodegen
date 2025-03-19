@@ -80,7 +80,6 @@ def get_dependencies() -> list[dict[str, str]]:
 @cache
 def get_version() -> str:
     deps = get_dependencies()
-    pprint.pprint(deps)
     for dep in deps:
         if dep["path"] == "restcodegen":
             return dep["version"]
