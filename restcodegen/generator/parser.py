@@ -7,7 +7,7 @@ import httpx
 from pydantic import BaseModel, Field, HttpUrl
 
 from restcodegen.generator.log import LOGGER
-from restcodegen.generator.utils import name_to_snake, snake_to_camel
+from restcodegen.generator.utils import name_to_snake, snake_to_camel, rename_python_builtins
 
 TYPE_MAP = {
     "integer": "int",
@@ -291,7 +291,7 @@ class OpenAPISpec:
     def _normalize_swagger_path(path: str) -> str:
         def replace_placeholder(match: re.Match) -> str:
             placeholder = match.group(0)[1:-1]
-            return "{" + name_to_snake(placeholder) + "}" if placeholder else ""
+            return "{" + rename_python_builtins(name_to_snake(placeholder)) + "}" if placeholder else ""
 
         normalized_path = re.sub(r"\{[^}]*\}", replace_placeholder, path)
         return normalized_path
