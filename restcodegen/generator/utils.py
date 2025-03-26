@@ -20,7 +20,7 @@ def name_to_snake(string: str) -> str:
     string = string.replace("{", "").replace("}", "")
     string = re.sub(r"([A-Z]+)([A-Z][a-z])", r"\1_\2", string)
     string = re.sub(r"([a-z\d])([A-Z])", r"\1_\2", string)
-    string = re.sub('&', 'and', string)
+    string = re.sub("&", "and", string)
     string = string.replace("-", "_").lower().strip("_")
     return string
 
@@ -56,12 +56,14 @@ def format_file() -> None:
         "ruff",
         "format",
         "./clients/http",
+        "./helpers/http",
     ]
     run_command(" ".join(command_format))
     command_check = [
         "ruff",
         "check",
         "./clients/http",
+        "./helpers/http",
         "--fix",
     ]
     run_command(" ".join(command_check))

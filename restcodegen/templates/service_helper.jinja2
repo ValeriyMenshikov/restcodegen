@@ -1,0 +1,15 @@
+# coding: utf-8
+{% include 'header.jinja2' %}
+
+{%- set service_name = service_name %}
+from restcodegen.restclient.client import Client
+from helpers.http.{{ service_name|to_snake_case }} import _{{ service_name|to_camel_case }}ServiceFacade
+
+
+class {{ service_name|to_camel_case }}(_{{ service_name|to_camel_case }}ServiceFacade):
+    """
+    Композитный фасад для реализации методов объединяющих логику нескольких классов логики одного сервиса.
+    При перегенерации, методы реализованные в этом классе не потеряются.
+    """
+    def __init__(self, api_client: Client) -> None:
+        super().__init__(api_client=api_client)

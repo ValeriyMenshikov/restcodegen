@@ -1,0 +1,21 @@
+# coding: utf-8
+# ruff: noqa: F405,F403
+{% include 'header.jinja2' %}
+
+
+{%- set api_name = api_name %}
+from clients.http.{{ service_name|to_snake_case }} import {{ api_name|to_camel_case }}Api as _{{ api_name|to_camel_case }}Api
+
+{% if models %}
+from clients.http.{{ service_name|to_snake_case }}.models.api_models import *
+{% endif %}
+
+
+class {{ api_name|to_camel_case }}Helper(_{{ api_name|to_camel_case }}Api):
+    """
+    Класс наследуется от сгенерированного класса API клиента.
+
+    В этом классе необходимо реализовывать логику ваших методов,
+    она не потеряется при перегенерации клиентов.
+
+    """

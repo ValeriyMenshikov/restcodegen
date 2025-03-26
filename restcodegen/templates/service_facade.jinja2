@@ -1,0 +1,25 @@
+# coding: utf-8
+{% include 'header.jinja2' %}
+
+
+{%- set service_name = service_name %}
+{%- set api_names = api_names %}
+
+from restcodegen.restclient.client import Client
+{%- for api_name in api_names %}
+from helpers.http.{{ service_name|to_snake_case }}.{{ api_name|to_snake_case }}_helper import {{ api_name|to_camel_case }}Helper
+{%- endfor %}
+
+
+class _{{ service_name|to_camel_case }}ServiceFacade:
+    """
+    Класс обертка необходимый для связки классов логики, необходим,
+    чтобы при перегенерации автоматически расширять композитый фасад классами логики сервиса.
+    """
+    def __init__(self, api_client: Client):
+        {% for api_name in api_names %}self.{{ api_name|to_snake_case }}_api = {{ api_name|to_camel_case }}Helper(api_client=api_client)
+        {% endfor %}
+
+
+
+__all__ = ["_{{ service_name|to_camel_case }}ServiceFacade"]

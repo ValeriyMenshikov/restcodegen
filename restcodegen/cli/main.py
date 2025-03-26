@@ -1,5 +1,6 @@
 import click
 
+from restcodegen.generator.logic_codegen import LogicGenerator
 from restcodegen.generator.parser import OpenAPISpec
 from restcodegen.generator.rest_codegen import RESTClientGenerator
 from restcodegen.generator.utils import format_file
@@ -50,6 +51,8 @@ def generate_command(
     )
     gen = RESTClientGenerator(openapi_spec=parser, async_mode=async_mode)
     gen.generate()
+    logic = LogicGenerator(openapi_spec=parser, async_mode=async_mode)
+    logic.generate()
     format_file()
 
 
