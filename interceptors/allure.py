@@ -1,42 +1,111 @@
+from json import JSONDecodeError
+from urllib.parse import urlparse, parse_qs
+
+import httpx
 import json
 import allure
-import curlify2
-import httpx
-from typing import Optional
+from curlify2 import Curlify
 
-from interceptors.base import Interceptor
+from interceptors.protocol import IInterceptor, AsyncIInterceptor
 
 
-class AllureAttachInterceptor:
-    def __init__(self, next_interceptor: Optional["Interceptor"] = None):
-        self.next_interceptor = next_interceptor
+class AsyncAllureInterceptor(AsyncIInterceptor):
+    async def on_request(self, request: httpx.Request) -> httpx.Request:
+        try:
+            json_data = json.loads(request.content) if request.content else None
+        except JSONDecodeError:
+            json_data = None
 
-    def intercept(self, request: httpx.Request, client: httpx.Client) -> httpx.Response:
+        parsed_url = urlparse(str(request.url))
+
+        request_params = {"event": "Request"}
+        if request.method:
+            request_params["method"] = request.method
+        if parsed_url.hostname:
+            request_params["host"] = parsed_url.hostname
+        if parsed_url.path:
+            request_params["path"] = parsed_url.path
+
+        if params := parse_qs(parsed_url.query):
+            request_params["params"] = params
+        if request.headers:
+            request_params["headers"] = dict(request.headers)
         if request.content:
-            try:
-                request_body = json.loads(request.content)
-                allure.attach(
-                    json.dumps(request_body, indent=4),
-                    name="request_body",
-                    attachment_type=allure.attachment_type.JSON,
-                )
-            except json.JSONDecodeError:
-                allure.attach(
-                    request.content.decode("utf-8"),
-                    name="request_body",
-                    attachment_type=allure.attachment_type.TEXT,
-                )
+            request_params["data"] = request.content.decode()
+        if isinstance(json_data, dict):
+            request_params["json"] = json_data
 
-        if self.next_interceptor:
-            response = self.next_interceptor.intercept(request, client)
-        else:
-            response = httpx.Client.send(client, request)
+        with allure.step(f"{request.method} {parsed_url.path}"):
+            allure.attach(
+                json.dumps(request_params, indent=4),
+                name="request_body",
+                attachment_type=allure.attachment_type.JSON,
+            )
+        return request
 
-        curl = curlify2.Curlify(request).to_curl()
+    async def on_response(self, response: httpx.Response) -> httpx.Response:
+        curl = Curlify(response.request).to_curl()
         allure.attach(curl, name="curl", attachment_type=allure.attachment_type.TEXT)
 
         try:
-            response_json = response.json()
+            response_json = json.loads(await response.aread())
+            allure.attach(
+                json.dumps(response_json, indent=4),
+                name="response_body",
+                attachment_type=allure.attachment_type.JSON,
+            )
+        except json.JSONDecodeError:
+            response_text = response.text
+            status_code = f"status code = {response.status_code}"
+            allure.attach(
+                response_text if len(response_text) > 0 else status_code,
+                name="response_body",
+                attachment_type=allure.attachment_type.TEXT,
+            )
+
+        return response
+
+
+class AllureInterceptor(IInterceptor):
+    def on_request(self, request: httpx.Request) -> httpx.Request:
+        try:
+            json_data = json.loads(request.content) if request.content else None
+        except JSONDecodeError:
+            json_data = None
+
+        parsed_url = urlparse(str(request.url))
+
+        request_params = {"event": "Request"}
+        if request.method:
+            request_params["method"] = request.method
+        if parsed_url.hostname:
+            request_params["host"] = parsed_url.hostname
+        if parsed_url.path:
+            request_params["path"] = parsed_url.path
+
+        if params := parse_qs(parsed_url.query):
+            request_params["params"] = params
+        if request.headers:
+            request_params["headers"] = dict(request.headers)
+        if request.content:
+            request_params["data"] = request.content.decode()
+        if isinstance(json_data, dict):
+            request_params["json"] = json_data
+
+        with allure.step(f"{request.method} {parsed_url.path}"):
+            allure.attach(
+                json.dumps(request_params, indent=4),
+                name="request_body",
+                attachment_type=allure.attachment_type.JSON,
+            )
+        return request
+
+    def on_response(self, response: httpx.Response) -> httpx.Response:
+        curl = Curlify(response.request).to_curl()
+        allure.attach(curl, name="curl", attachment_type=allure.attachment_type.TEXT)
+
+        try:
+            response_json = json.loads(response.read())
             allure.attach(
                 json.dumps(response_json, indent=4),
                 name="response_body",
