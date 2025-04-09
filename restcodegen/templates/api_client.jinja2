@@ -169,7 +169,7 @@ class {{ api_name|to_camel_case }}Api:
             "{{ query_param.get('name') }}": {{ query_param.get('name')|to_snake_case|rename_python_builtins }},
             {%- endfor %}
             }
-        params = {k: v for k, v in params_map.items() if v}
+        params = {k: v for k, v in params_map.items() if v is not None}
         {%- endif %}
 
         {%- if headers %}
@@ -179,7 +179,7 @@ class {{ api_name|to_camel_case }}Api:
             "{{ header.get('name') }}": str({{ header.get('name')|to_snake_case|rename_python_builtins }}),
             {%- endfor %}
         }
-        headers = {k: str(v) for k, v in headers_map.items() if v}
+        headers = {k: str(v) for k, v in headers_map.items() if v is not None}
 
         headers_from_kwargs = kwargs.pop("headers", {})
         if headers_from_kwargs:
