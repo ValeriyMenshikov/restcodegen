@@ -1,15 +1,36 @@
+"""
+OpenAPI specification parser for REST code generation.
+"""
 import json
 import re
+from enum import Enum
 from pathlib import Path
-from typing import Any, Optional, Union
+from typing import (
+    Any,
+    TypedDict,
+)
 
 import httpx
-from pydantic import BaseModel, Field, HttpUrl
+from pydantic import BaseModel, \
+    Field, \
+    HttpUrl
 
 from restcodegen.generator.log import LOGGER
-from restcodegen.generator.utils import name_to_snake, snake_to_camel, rename_python_builtins
+from restcodegen.generator.utils import name_to_snake, \
+    snake_to_camel, \
+    rename_python_builtins
 
-TYPE_MAP = {
+
+class ParamType(str, Enum):
+    """Parameter types in OpenAPI spec."""
+    HEADER = "header"
+    PATH = "path"
+    QUERY = "query"
+    BODY = "body"
+
+
+# Type mapping from OpenAPI types to Python types
+TYPE_MAP: dict[str, str] = {
     "integer": "int",
     "number": "float",
     "string": "str",
@@ -19,321 +40,492 @@ TYPE_MAP = {
     "none": "Any",
 }
 
-DEFAULT_HEADER_VALUE_MAP = {"int": 0, "float": 0.0, "str": "", "bool": True}
+# Default values for header parameters
+DEFAULT_HEADER_VALUE_MAP: dict[str, Any] = {
+    "int": 0,
+    "float": 0.0,
+    "str": "",
+    "bool": True
+}
+
+
+class ParameterDict(TypedDict, total=False):
+    """Type definition for parameter dictionaries."""
+    name: str
+    type: str
+    description: str
+    required: bool
+    default: Any
 
 
 class Handler(BaseModel):
-    path: str = Field(...)
-    method: str = Field(...)
-    tags: list = Field(...)
-    summary: Optional[str] = Field(None)
-    operation_id: Optional[str] = Field(None)
-    path_parameters: Optional[list] = Field(None)
-    query_parameters: Optional[list] = Field(None)
-    headers: Optional[list] = Field(None)
-    request_body: Optional[str] = Field(None)
-    responses: Optional[dict] = Field(None)
+    """Handler model representing an API endpoint."""
+    path: str = Field(..., description="API endpoint path")
+    method: str = Field(..., description="HTTP method")
+    tags: list[str] = Field(..., description="API tags")
+    summary: str | None = Field(None, description="Endpoint summary")
+    operation_id: str | None = Field(None, description="Operation ID")
+    path_parameters: list[dict[str, Any]] | None = Field(None, description="Path parameters")
+    query_parameters: list[dict[str, Any]] | None = Field(None, description="Query parameters")
+    headers: list[dict[str, Any]] | None = Field(None, description="Header parameters")
+    request_body: str | None = Field(None, description="Request body model name")
+    responses: dict[str, str] | None = Field(None, description="Response models by status code")
 
     def get(self, key: str, default: Any = None) -> Any:
+        """Get attribute by name with default fallback."""
         return getattr(self, key, default)
 
 
 class OpenAPISpec:
+    """
+    OpenAPI specification parser that loads and processes OpenAPI/Swagger specifications.
+    Supports both OpenAPI 3.x and Swagger 2.x formats.
+    """
     BASE_PATH = Path.cwd() / "clients" / "http"
+    EXCLUDED_PARAMS = ["x-o3-app-name"]
 
     def __init__(
-        self,
-        openapi_spec: Union[str, HttpUrl],
-        service_name: str,
-        api_tags: Optional[list[str]] = None,
+            self,
+            openapi_spec: str | HttpUrl,
+            service_name: str,
+            api_tags: list[str] | None = None,
     ) -> None:
+        """
+        Initialize OpenAPI specification parser.
+
+        Args:
+            openapi_spec: Path or URL to OpenAPI specification
+            service_name: Service name
+            api_tags: List of API tags to filter by
+        """
         self.spec_path = str(openapi_spec)
-        self.itc_service_name = service_name
-        self.cache_spec_dir = self.BASE_PATH / "schemas"
+        self.service_name = service_name
+        self.cache_spec_dir = self._ensure_cache_dir()
+        self.cache_spec_path = self.cache_spec_dir / f"{name_to_snake(self.service_name)}.json"
 
-        if not self.cache_spec_dir.exists():
-            self.cache_spec_dir.mkdir(parents=True, exist_ok=True)
-
-        self.cache_spec_path = (
-            self.cache_spec_dir / f"{name_to_snake(self.itc_service_name)}.json"
-        )
-
-        self.openapi_spec: dict = self._open()
+        # Parse OpenAPI spec
+        self.openapi_spec: dict[str, Any] = self._load_spec()
         self.version: str = ""
         self.description: str = ""
         self.openapi_version: str = ""
-        self.handlers: list[Handler] = []
+
+        # Containers for parsed data
+        self.handlers: [Handler] = []
         self.request_models: set[str] = set()
         self.response_models: set[str] = set()
-        self.api_tags: set[str] = set(api_tags) if api_tags else set()
+        self.api_tags: set[str] = set(api_tags or [])
         self.all_tags: set[str] = set()
+
+        # Process the specification
         self.parse_openapi_spec()
+
+    def _ensure_cache_dir(self) -> Path:
+        """Ensure cache directory exists and return its path."""
+        cache_dir = self.BASE_PATH / "schemas"
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        return cache_dir
 
     @property
     def apis(self) -> set[str]:
+        """
+        Get filtered API tags based on provided api_tags.
+
+        Returns:
+            Set of API tags to process
+        """
         result_tags = set()
+
+        # Filter tags that exist in the spec
         for tag in self.api_tags:
             if tag not in self.all_tags:
-                LOGGER.warning(f"Tag {tag} not found in openapi spec")
+                LOGGER.warning(f"Tag {tag} not found in OpenAPI spec")
             else:
                 result_tags.add(tag)
 
-        if not result_tags and self.api_tags:
-            LOGGER.warning("Tags not found in openapi spec, used default tags")
-            return self.all_tags
-        elif not result_tags and not self.api_tags:
+        # Fallback to all tags if no valid tags found
+        if not result_tags:
+            if self.api_tags:
+                LOGGER.warning("Tags not found in OpenAPI spec, using default tags")
             return self.all_tags
 
         return result_tags
 
     @property
-    def service_name(self) -> str:
-        return self.itc_service_name
-
-    @property
     def client_type(self) -> str:
+        """Get client type."""
         return "http"
 
     @staticmethod
-    def _patch(swagger_scheme: dict) -> dict:
+    def _patch(swagger_scheme: dict[str, Any]) -> dict[str, Any]:
         """
-        Patch swagger json file to avoid multi files gen.
+        Patch swagger JSON to handle schemas with dots in their names.
 
-        :param swagger_scheme: Swagger json
+        Args:
+            swagger_scheme: Original swagger/OpenAPI JSON
+
+        Returns:
+            Patched swagger/OpenAPI JSON
         """
         json_content = json.dumps(swagger_scheme)
+
+        # Find schemas that need patching (containing dots)
         schemas = swagger_scheme.get("components", {}).get(
             "schemas", {}
         ) or swagger_scheme.get("definitions", {})
         schemas_to_patch = [schema for schema in schemas if "." in schema]
 
+        # Find tags with dots in paths
         for _, methods in swagger_scheme.get("paths", {}).items():
             for _, method in methods.items():
                 for tag in method.get("tags", []):
                     if "." in tag:
                         schemas_to_patch.append(tag)
 
+        # Replace dots in schema references
         for schema in schemas_to_patch:
             for text in [f'/{schema}"', f'"{schema}"']:
                 json_content = json_content.replace(text, text.replace(".", ""))
 
         return json.loads(json_content)
 
-    def _get_spec_by_url(self) -> Union[dict, None]:
+    def _load_spec(self) -> dict[str, Any]:
+        """
+        Load OpenAPI specification from URL, file path or cache.
+
+        Returns:
+            Parsed OpenAPI specification as dictionary
+        """
+        # Try loading from URL first
+        spec = self._get_spec_by_url()
+
+        # Try loading from file path if URL failed
+        if not spec:
+            spec = self._get_spec_by_path()
+
+        # Fall back to cache if both URL and path failed
+        if not spec:
+            spec = self._get_spec_from_cache()
+
+        return spec
+
+    def _get_spec_by_url(self) -> dict[str, Any] | None:
+        """
+        Try to load OpenAPI spec from URL.
+
+        Returns:
+            Parsed OpenAPI spec or None if failed
+        """
         try:
             response = httpx.get(self.spec_path, timeout=5)
             response.raise_for_status()
-        except httpx.HTTPError:
-            spec = {}
-            LOGGER.warning(f"OpenAPI spec not available by url: {self.spec_path} ")
-            file_path = (
-                self.spec_path
-                if Path(self.spec_path).is_file()
-                else str(self.cache_spec_path)
-            )
-            if Path(file_path).is_file():
-                LOGGER.warning(f"Try open OpenAPI spec by path: {file_path}")
-                with open(file_path, "r") as f:
-                    spec = self._patch(json.loads(f.read()))
-            return spec
-        else:
+
+            # Process and cache the spec
             spec = self._patch(response.json())
             with open(self.cache_spec_path, "w") as f:
                 f.write(json.dumps(spec, indent=4, ensure_ascii=False))
             return spec
 
-    def _get_spec_from_cache(self) -> dict:
+        except httpx.HTTPError:
+            LOGGER.warning(f"OpenAPI spec not available by URL: {self.spec_path}")
+
+            # Try to use local file as fallback
+            file_path = (
+                self.spec_path
+                if Path(self.spec_path).is_file()
+                else str(self.cache_spec_path)
+            )
+
+            if Path(file_path).is_file():
+                LOGGER.warning(f"Trying to open OpenAPI spec from path: {file_path}")
+                with open(file_path, "r") as f:
+                    return self._patch(json.loads(f.read()))
+
+            return None
+
+    def _get_spec_from_cache(self) -> dict[str, Any]:
+        """
+        Load OpenAPI spec from cache.
+
+        Returns:
+            Parsed OpenAPI spec
+
+        Raises:
+            FileNotFoundError: If spec not found in cache
+        """
         try:
             with open(self.cache_spec_path, "r") as f:
                 spec = self._patch(json.loads(f.read()))
-                self.spec_path = self.cache_spec_path  # type: ignore
-                LOGGER.warning(f"OpenAPI spec got from cash: {self.spec_path}")
+                self.spec_path = str(self.cache_spec_path)
+                LOGGER.warning(f"OpenAPI spec loaded from cache: {self.spec_path}")
                 return spec
         except FileNotFoundError as e:
             raise FileNotFoundError(
-                f"OpenAPI spec not available from url: {self.spec_path}, and not found in cash"
+                f"OpenAPI spec not available from URL: {self.spec_path}, and not found in cache"
             ) from e
 
-    def _get_spec_by_path(self) -> Union[dict, None]:
+    def _get_spec_by_path(self) -> dict[str, Any] | None:
+        """
+        Try to load OpenAPI spec from file path.
+
+        Returns:
+            Parsed OpenAPI spec or None if file not found
+        """
         try:
             with open(self.spec_path, "r") as f:
-                spec = json.loads(f.read())
+                return self._patch(json.loads(f.read()))
         except FileNotFoundError:
-            LOGGER.warning(f"OpenAPI spec not found from local path: {self.spec_path}")
+            LOGGER.warning(f"OpenAPI spec not found at local path: {self.spec_path}")
             return None
-        else:
-            return spec
 
-    def _open(self) -> dict:
-        spec = self._get_spec_by_url()
-        if not spec:
-            spec = self._get_spec_by_path()
-        if not spec:
-            spec = self._get_spec_from_cache()
-        return spec
+    def _extract_model_name(self, schema_ref: str | None) -> str | None:
+        """
+        Extract and format model name from schema reference.
 
-    def _get_request_body(self, request_body: Union[dict, list]) -> Union[str, None]:
+        Args:
+            schema_ref: Schema reference string
+
+        Returns:
+            Formatted model name or None if no reference
+        """
+        if not schema_ref:
+            return None
+
+        model_name = snake_to_camel(schema_ref.split("/")[-1])
+        # Ensure first letter is uppercase for model names
+        return model_name[0].upper() + model_name[1:] if model_name else None
+
+    def _get_request_body(self, request_body: dict[str, Any] | list[dict[str, Any]]) -> str | None:
+        """
+        Extract request body model from OpenAPI spec.
+
+        Args:
+            request_body: Request body specification
+
+        Returns:
+            Model name or None if no request body
+        """
+        # Handle Swagger 2.0 format (list of parameters)
         if isinstance(request_body, list):
             for parameter in request_body:
-                if parameter.get("in") == "body":
-                    schema = parameter.get("schema", {}).get("$ref", None)
-                    if schema:
-                        model_path = snake_to_camel(schema.split("/")[-1])
-                        model_name = model_path[0].upper() + model_path[1:]
-                        self.request_models.add(model_name)
-                        return model_name
+                if parameter.get("in") == ParamType.BODY:
+                    schema_ref = parameter.get("schema", {}).get("$ref")
+                    if schema_ref:
+                        model_name = self._extract_model_name(schema_ref)
+                        if model_name:
+                            self.request_models.add(model_name)
+                            return model_name
+        # Handle OpenAPI 3.0 format
         else:
             for content_type in request_body.get("content", {}).keys():
-                schema = (
+                schema_ref = (
                     request_body.get("content", {})
                     .get(content_type, {})
                     .get("schema", {})
-                    .get("$ref", None)
+                    .get("$ref")
                 )
-                if schema:
-                    model_name = snake_to_camel(schema.split("/")[-1])
-                    self.request_models.add(model_name)
-                    return model_name
+                if schema_ref:
+                    model_name = self._extract_model_name(schema_ref)
+                    if model_name:
+                        self.request_models.add(model_name)
+                        return model_name
+
         return None
 
-    def _get_response_body(self, response_body: dict) -> dict:
-        responses: dict = {}
-        if response_body:
-            if self.openapi_version.startswith("3."):
-                for status_code in response_body.keys():
-                    for content_type in (
-                        response_body.get(status_code, {}).get("content", {}).keys()
-                    ):
-                        schema = (
-                            response_body.get(status_code, {})
-                            .get("content", {})
-                            .get(content_type, {})
-                            .get("schema", {})
-                            .get("$ref", None)
-                        )
-                        model_name = schema.split("/")[-1] if schema else None
-                        if model_name:
-                            model_name = snake_to_camel(model_name)
-                            responses[status_code] = model_name
-                            self.response_models.add(model_name)
-            elif self.openapi_version.startswith("2."):
-                for status_code, response in response_body.items():
-                    ref_schema = response.get("schema", {}).get("$ref")
-                    result_schema = response.get("schema", {}).get("result")
-                    schema = ref_schema or result_schema
-                    if schema:
-                        model = snake_to_camel(schema.split("/")[-1])
-                        responses[status_code] = model
-                        model_name = model[0].upper() + model[1:]
+    def _get_response_body(self, response_body: dict[str, Any]) -> dict[str, str]:
+        """
+        Extract response models from OpenAPI spec.
+
+        Args:
+            response_body: Response specification
+
+        Returns:
+            Dictionary mapping status codes to model names
+        """
+        responses: dict[str, str] = {}
+
+        if not response_body:
+            return responses
+
+        # Handle OpenAPI 3.0 format
+        if self.openapi_version.startswith("3."):
+            for status_code, response_spec in response_body.items():
+                for content_type in response_spec.get("content", {}).keys():
+                    schema_ref = (
+                        response_spec
+                        .get("content", {})
+                        .get(content_type, {})
+                        .get("schema", {})
+                        .get("$ref")
+                    )
+
+                    model_name = self._extract_model_name(schema_ref)
+                    if model_name:
                         responses[status_code] = model_name
                         self.response_models.add(model_name)
+
+        # Handle Swagger 2.0 format
+        elif self.openapi_version.startswith("2."):
+            for status_code, response in response_body.items():
+                schema_ref = response.get("schema", {}).get("$ref") or response.get("schema", {}).get("result")
+
+                model_name = self._extract_model_name(schema_ref)
+                if model_name:
+                    responses[status_code] = model_name
+                    self.response_models.add(model_name)
+
         return responses
 
-    def _get_headers(self, parameters: list) -> list:
-        params = self._get_params_with_types(parameters, param_type="header")
-        return params
+    def _get_parameters(self, parameters: list[dict[str, Any]], param_type: ParamType) -> list[ParameterDict]:
+        """
+        Extract parameters of specified type from OpenAPI spec.
 
-    def _get_request_parameters(self, parameters: list) -> list:
-        params = self._get_params_with_types(parameters, param_type="header")
-        return params
+        Args:
+            parameters: List of parameters
+            param_type: Parameter type to extract
 
-    def _get_path_parameters(self, parameters: list) -> list:
-        params = self._get_params_with_types(parameters, param_type="path")
-        return params
+        Returns:
+            List of processed parameters
+        """
+        return self._get_params_with_types(parameters, param_type)
 
-    def _get_query_parameters(self, parameters: list) -> list:
-        params = self._get_params_with_types(parameters, param_type="query")
-        return params
+    def _get_params_with_types(self, parameters: list[dict[str, Any]], param_type: ParamType) -> list[ParameterDict]:
+        """
+        Process parameters and extract type information.
 
-    @staticmethod
-    def _get_params_with_types(parameters: list, param_type: str) -> list:
-        params: list[dict[str, str]] = []
-        exclude_params = ["x-o3-app-name"]
+        Args:
+            parameters: List of parameters
+            param_type: Parameter type to extract
+
+        Returns:
+            List of processed parameters with type information
+        """
         if not parameters:
-            return params
+            return []
+
+        params: list[ParameterDict] = []
+
         for parameter in parameters:
-            if parameter.get("in") == param_type:
-                parameter_type = parameter.get("schema", {})
-                any_of = parameter_type.get("anyOf")
-                enum = parameter_type.get("$ref")
+            # Skip parameters that don't match the requested type
+            if parameter.get("in") != param_type:
+                continue
 
-                parameter_type = parameter_type.get("type")
-                parameter_name = parameter.get("name")
-                parameter_description = parameter.get("description", "")
-                parameter_is_required = parameter.get("required", False)
+            # Skip excluded parameters
+            parameter_name = parameter.get("name")
+            if parameter_name in self.EXCLUDED_PARAMS:
+                continue
 
-                if parameter_name in exclude_params:
-                    continue
+            # Extract parameter metadata
+            schema = parameter.get("schema", {})
+            any_of = schema.get("anyOf")
+            enum = schema.get("$ref")
+            parameter_type = schema.get("type")
+            parameter_description = parameter.get("description", "")
+            parameter_is_required = parameter.get("required", False)
 
-                if any_of:
-                    parameter_type = "anyof"
-                if enum:
-                    parameter_type = enum.split("/")[-1]
+            # Handle special cases
+            if any_of:
+                parameter_type = "anyof"
+            if enum:
+                parameter_type = enum.split("/")[-1]
 
-                parameter_with_desc = {
-                    "name": parameter_name,
-                    "type": parameter_type
-                    if enum
-                    else TYPE_MAP[str(parameter_type).lower()],
-                    "description": parameter_description,
-                    "required": parameter_is_required,
-                }
+            # Create parameter dictionary
+            param_dict: ParameterDict = {
+                "name": parameter_name,
+                "type": parameter_type if enum else TYPE_MAP[str(parameter_type).lower()],
+                "description": parameter_description,
+                "required": parameter_is_required,
+            }
 
-                if not parameter_is_required:
-                    parameter_with_desc["default"] = DEFAULT_HEADER_VALUE_MAP.get(
-                        TYPE_MAP.get(parameter_type, "")
-                    )
-                params.append(parameter_with_desc)
+            # Add default value for optional parameters
+            if not parameter_is_required:
+                python_type = TYPE_MAP.get(str(parameter_type).lower(), "")
+                param_dict["default"] = DEFAULT_HEADER_VALUE_MAP.get(python_type)
+
+            params.append(param_dict)
 
         return params
 
     @staticmethod
     def _normalize_swagger_path(path: str) -> str:
+        """
+        Normalize path parameters in swagger path.
+
+        Args:
+            path: Original path with parameters
+
+        Returns:
+            Normalized path with snake_case parameters
+        """
+
         def replace_placeholder(match: re.Match) -> str:
             placeholder = match.group(0)[1:-1]
             return "{" + rename_python_builtins(name_to_snake(placeholder)) + "}" if placeholder else ""
 
-        normalized_path = re.sub(r"\{[^}]*\}", replace_placeholder, path)
-        return normalized_path
+        return re.sub(r"\{[^}]*\}", replace_placeholder, path)
 
     def parse_openapi_spec(self) -> list[Handler]:
+        """
+        Parse OpenAPI specification and extract API endpoints.
+
+        Returns:
+            List of parsed handlers
+        """
+        # Extract metadata
         info = self.openapi_spec.get("info", {})
         self.version = info.get("version", "1.0.0")
         self.description = info.get("description", "")
-        self.openapi_version = self.openapi_spec.get(
-            "openapi", ""
-        ) or self.openapi_spec.get("swagger", "")
+        self.openapi_version = (
+                self.openapi_spec.get("openapi", "") or
+                self.openapi_spec.get("swagger", "")
+        )
 
+        # Warn about unsupported versions
         if self.openapi_version.startswith("2."):
             LOGGER.warning(
-                "OpenAPI/Swagger version 2.0 is not supported. "
-                "You may convert it to 3.0 with https://converter.swagger.io/ "
+                "OpenAPI/Swagger version 2.0 is not fully supported. "
+                "Consider converting to 3.0 with https://converter.swagger.io/ "
                 "and set the local spec path in 'swagger' option in nuke.toml!"
             )
 
+        # Process all paths and methods
         paths = self.openapi_spec.get("paths", {})
         for path, methods in paths.items():
             for method, details in methods.items():
                 self._process_method(path, method, details)
+
         return self.handlers
 
-    def _process_method(self, path: str, method: str, details: dict) -> None:
-        tags = details.get("tags", [])
-        for tag in tags:
-            self.all_tags.add(tag)
+    def _process_method(self, path: str, method: str, details: dict[str, Any]) -> None:
+        """
+        Process API method details and create handler.
 
+        Args:
+            path: API path
+            method: HTTP method
+            details: Method details
+        """
+        # Extract tags and add to all_tags
+        tags = details.get("tags", [])
+        self.all_tags.update(tags)
+
+        # Extract basic metadata
         summary = details.get("summary", "")
         operation_id = details.get("operationId", "")
         parameters = details.get("parameters", [])
-        query_parameters = self._get_query_parameters(parameters)
-        path_parameters = self._get_path_parameters(parameters)
-        headers = self._get_headers(parameters)
+
+        # Process parameters by type
+        query_parameters = self._get_parameters(parameters, ParamType.QUERY)
+        path_parameters = self._get_parameters(parameters, ParamType.PATH)
+        headers = self._get_parameters(parameters, ParamType.HEADER)
+
+        # Process request body and responses
         request_body = self._get_request_body(
             details.get("requestBody", details.get("parameters", {}))
         )
         responses = self._get_response_body(details.get("responses", {}))
 
-        path_obj = Handler(
+        # Create and store handler
+        handler = Handler(
             path=self._normalize_swagger_path(path),
             method=method,
             tags=tags,
@@ -345,38 +537,63 @@ class OpenAPISpec:
             request_body=request_body,
             responses=responses,
         )
-        self.handlers.append(path_obj)
+        self.handlers.append(handler)
 
     def models_by_tag(self, tag: str) -> set[str]:
+        """
+        Get all models used by handlers with specified tag.
+
+        Args:
+            tag: API tag
+
+        Returns:
+            Set of model names
+        """
         models = set()
+
         for handler in self.handlers:
-            if tag in handler.tags:
-                if handler.path_parameters is not None:
-                    for param in handler.path_parameters:
-                        param = param["type"]
-                        if param not in TYPE_MAP.values():
-                            models.add(param)
-                if handler.query_parameters is not None:
-                    for query_param in handler.query_parameters:
-                        query_param = query_param["type"]
-                        if query_param not in TYPE_MAP.values():
-                            models.add(query_param)
-                if handler.headers is not None:
-                    for header_param in handler.headers:
-                        header_param = header_param["type"]
-                        if header_param not in TYPE_MAP.values():
-                            models.add(header_param)
-                if handler.request_body is not None:
-                    models.add(handler.request_body)
-                if handler.responses is not None:
-                    models.update(handler.responses.values())
+            if tag not in handler.tags:
+                continue
+
+            # Extract models from path parameters
+            if handler.path_parameters:
+                for param in handler.path_parameters:
+                    param_type = param["type"]
+                    if param_type not in TYPE_MAP.values():
+                        models.add(param_type)
+
+            # Extract models from query parameters
+            if handler.query_parameters:
+                for param in handler.query_parameters:
+                    param_type = param["type"]
+                    if param_type not in TYPE_MAP.values():
+                        models.add(param_type)
+
+            # Extract models from headers
+            if handler.headers:
+                for param in handler.headers:
+                    param_type = param["type"]
+                    if param_type not in TYPE_MAP.values():
+                        models.add(param_type)
+
+            # Add request body model
+            if handler.request_body:
+                models.add(handler.request_body)
+
+            # Add response models
+            if handler.responses:
+                models.update(handler.responses.values())
+
         return models
 
     def handlers_by_tag(self, tag: str) -> list[Handler]:
+        """Get handlers filtered by tag."""
         return [h for h in self.handlers if tag in h.tags]
 
     def handlers_by_method(self, method: str) -> list[Handler]:
+        """Get handlers filtered by HTTP method."""
         return [h for h in self.handlers if h.method == method]
 
     def handler_by_path(self, path: str) -> list[Handler]:
+        """Get handlers filtered by path."""
         return [h for h in self.handlers if h.path == path]
