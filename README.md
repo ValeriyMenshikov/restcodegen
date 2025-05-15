@@ -42,7 +42,7 @@ poetry add restcodegen
 ### Basic Command
 
 ```bash
-restcodegen generate -u "http://example.com/openapi.json" -s "my-service" -a false
+restcodegen generate -u "http://example.com/openapi.json" -s "my-service"
 ```
 
 ### Command Parameters
