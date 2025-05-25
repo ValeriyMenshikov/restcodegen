@@ -82,7 +82,7 @@ class RESTClientGenerator(BaseTemplateGenerator):
             async_mode=self.async_mode,
             models=models,
             data_list=handlers,
-            api_name=tag,
+            api_name=NamingUtils.to_pascal_case(NamingUtils.to_snake_case(tag)),
             service_name=self.openapi_spec.service_name,
             version=self.version,
         )
