@@ -5,7 +5,7 @@ from jinja2 import Environment, FileSystemLoader
 
 from restcodegen.generator import TEMPLATES
 from restcodegen.generator.log import LOGGER
-from restcodegen.generator.utils import name_to_snake, snake_to_camel, get_version, rename_python_builtins
+from restcodegen.generator.utils import NamingUtils, get_version
 
 
 class BaseGenerator:
@@ -62,9 +62,12 @@ class BaseTemplateGenerator(BaseGenerator):
             autoescape=True
         )  # type: ignore
         
-        # Register custom filters
-        env.filters["to_snake_case"] = name_to_snake
-        env.filters["to_camel_case"] = snake_to_camel
-        env.filters["rename_python_builtins"] = rename_python_builtins
+        # Register naming utility filters for consistent naming
+        env.filters["to_snake_case"] = NamingUtils.to_snake_case
+        env.filters["to_param_name"] = NamingUtils.to_param_name
+        env.filters["to_class_name"] = NamingUtils.to_class_name
+        env.filters["to_type_annotation"] = NamingUtils.to_type_annotation
+        env.filters["to_pascal_case"] = NamingUtils.to_pascal_case
+        env.filters["to_camel_case"] = NamingUtils.to_camel_case
         
         return env

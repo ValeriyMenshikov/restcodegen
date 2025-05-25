@@ -5,9 +5,8 @@ from datamodel_code_generator import DataModelType, generate
 
 from restcodegen.generator.base import BaseTemplateGenerator
 from restcodegen.generator.log import LOGGER
-from restcodegen.generator.parser import OpenAPISpec, Handler
-from restcodegen.generator.patcher import ClientModelPatcher
-from restcodegen.generator.utils import create_and_write_file, name_to_snake
+from restcodegen.generator.parser import OpenAPISpec
+from restcodegen.generator.utils import create_and_write_file, NamingUtils
 
 
 class RESTClientGenerator(BaseTemplateGenerator):
@@ -31,19 +30,6 @@ class RESTClientGenerator(BaseTemplateGenerator):
         super().__init__(templates_dir=templates_dir)
         self.openapi_spec = openapi_spec
         self.async_mode = async_mode
-        self._patcher = self._create_patcher()
-        
-    def _create_patcher(self) -> ClientModelPatcher:
-        """Create a model patcher for the generated client.
-        
-        Returns:
-            Configured ClientModelPatcher instance
-        """
-        service_name_snake = name_to_snake(self.openapi_spec.service_name)
-        return ClientModelPatcher(
-            models_path=self.BASE_PATH / service_name_snake / "models" / "api_models.py",
-            client_path=self.BASE_PATH / service_name_snake / "apis",
-        )
 
     def generate(self) -> None:
         """Generate all components of the REST client."""
@@ -51,13 +37,12 @@ class RESTClientGenerator(BaseTemplateGenerator):
         self._gen_clients()
         self._gen_init_apis()
         self._gen_models()
-        self._patcher.patch_client_files()
         LOGGER.info(f"REST client generation completed for: {self.openapi_spec.service_name}")
 
     def _gen_init_apis(self) -> None:
         """Generate __init__.py file for the APIs package."""
         LOGGER.info("Generating __init__.py for APIs")
-        service_name_snake = name_to_snake(self.openapi_spec.service_name)
+        service_name_snake = NamingUtils.to_snake_case(self.openapi_spec.service_name)
         
         rendered_code = self.env.get_template("apis_init.jinja2").render(
             api_names=self.openapi_spec.apis,
@@ -77,7 +62,7 @@ class RESTClientGenerator(BaseTemplateGenerator):
 
     def _gen_clients(self) -> None:
         """Generate client API files for each API tag."""
-        service_name_snake = name_to_snake(self.openapi_spec.service_name)
+        service_name_snake = NamingUtils.to_snake_case(self.openapi_spec.service_name)
         
         for tag in self.openapi_spec.apis:
             LOGGER.info(f"Generating REST client for tag: {tag}")
@@ -103,7 +88,7 @@ class RESTClientGenerator(BaseTemplateGenerator):
         )
         
         # Create API file
-        file_name = f"{name_to_snake(tag)}_api.py"
+        file_name = f"{NamingUtils.to_snake_case(tag)}_api.py"
         file_path = self.BASE_PATH / service_name_snake / "apis" / file_name
         create_and_write_file(file_path=file_path, text=rendered_code)
         
@@ -115,7 +100,7 @@ class RESTClientGenerator(BaseTemplateGenerator):
     def _gen_models(self) -> None:
         """Generate model files based on OpenAPI schemas."""
         LOGGER.info(f"Generating models for service: {self.openapi_spec.service_name}")
-        service_name_snake = name_to_snake(self.openapi_spec.service_name)
+        service_name_snake = NamingUtils.to_snake_case(self.openapi_spec.service_name)
         
         # Create model directory and files
         models_dir = self.BASE_PATH / service_name_snake / "models"

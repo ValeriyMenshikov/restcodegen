@@ -18,8 +18,8 @@ from pydantic import BaseModel, \
 from restcodegen.generator.log import LOGGER
 from restcodegen.generator.utils import name_to_snake, \
     snake_to_camel, \
-    rename_python_builtins
-
+    rename_python_builtins, \
+    NamingUtils
 
 class ParamType(str, Enum):
     """Parameter types in OpenAPI spec."""
@@ -279,20 +279,20 @@ class OpenAPISpec:
 
     def _extract_model_name(self, schema_ref: str | None) -> str | None:
         """
-        Extract and format model name from schema reference.
+        Extract model name from schema reference.
 
         Args:
             schema_ref: Schema reference string
 
         Returns:
-            Formatted model name or None if no reference
+            Model name or None if no valid reference
         """
-        if not schema_ref:
+        if not schema_ref or "#/definitions/" not in schema_ref and "#/components/schemas/" not in schema_ref:
             return None
 
-        model_name = snake_to_camel(schema_ref.split("/")[-1])
-        # Ensure first letter is uppercase for model names
-        return model_name[0].upper() + model_name[1:] if model_name else None
+        # Use NamingUtils to ensure consistent class naming
+        model_name = NamingUtils.to_class_name(schema_ref.split("/")[-1])
+        return model_name
 
     def _get_request_body(self, request_body: dict[str, Any] | list[dict[str, Any]]) -> str | None:
         """
@@ -375,6 +375,81 @@ class OpenAPISpec:
 
         return responses
 
+    def _get_parameter_type(self, parameter: dict[str, Any]) -> str:
+        """
+        Get parameter type from OpenAPI spec.
+
+        Args:
+            parameter: Parameter specification
+
+        Returns:
+            Python type for the parameter
+        """
+        schema = parameter.get("schema", {})
+        param_type = schema.get("type")
+
+        if not param_type:
+            # Handle $ref in schema
+            ref = schema.get("$ref")
+            if ref:
+                return self._extract_model_name(ref)
+
+            # Handle arrays
+            items = schema.get("items", {})
+            if items:
+                item_type = items.get("type")
+                if item_type:
+                    return f"list[{TYPE_MAP.get(item_type, 'Any')}]"
+                ref = items.get("$ref")
+                if ref:
+                    model_name = self._extract_model_name(ref)
+                    return f"list[{model_name}]"
+
+            return "Any"
+
+        # Handle basic types
+        if param_type in TYPE_MAP:
+            return TYPE_MAP[param_type]
+
+        # Handle arrays
+        if param_type == "array":
+            items = schema.get("items", {})
+            item_type = items.get("type")
+            if item_type:
+                return f"list[{TYPE_MAP.get(item_type, 'Any')}]"
+            ref = items.get("$ref")
+            if ref:
+                model_name = self._extract_model_name(ref)
+                return f"list[{model_name}]"
+
+        return "Any"
+
+    def _process_parameter(self, parameter: dict[str, Any]) -> ParameterDict:
+        """
+        Process a parameter from OpenAPI spec.
+
+        Args:
+            parameter: Parameter specification
+
+        Returns:
+            Processed parameter dictionary
+        """
+        param_dict: ParameterDict = {
+            "name": NamingUtils.to_param_name(parameter.get("name", "")),
+            "type": self._get_parameter_type(parameter),
+            "required": parameter.get("required", False),
+        }
+
+        # Add description if available
+        if "description" in parameter:
+            param_dict["description"] = parameter["description"]
+
+        # Add default value if available
+        if "default" in parameter.get("schema", {}):
+            param_dict["default"] = parameter["schema"]["default"]
+
+        return param_dict
+
     def _get_parameters(self, parameters: list[dict[str, Any]], param_type: ParamType) -> list[ParameterDict]:
         """
         Extract parameters of specified type from OpenAPI spec.
@@ -414,54 +489,11 @@ class OpenAPISpec:
             if parameter_name in self.EXCLUDED_PARAMS:
                 continue
 
-            # Extract parameter metadata
-            schema = parameter.get("schema", {})
-            any_of = schema.get("anyOf")
-            enum = schema.get("$ref")
-            parameter_type = schema.get("type")
-            parameter_description = parameter.get("description", "")
-            parameter_is_required = parameter.get("required", False)
-
-            # Handle special cases
-            if any_of:
-                parameter_type = "anyof"
-            if enum:
-                parameter_type = enum.split("/")[-1]
-
-            # Create parameter dictionary
-            param_dict: ParameterDict = {
-                "name": parameter_name,
-                "type": parameter_type if enum else TYPE_MAP[str(parameter_type).lower()],
-                "description": parameter_description,
-                "required": parameter_is_required,
-            }
-
-            # Add default value for optional parameters
-            if not parameter_is_required:
-                python_type = TYPE_MAP.get(str(parameter_type).lower(), "")
-                param_dict["default"] = DEFAULT_HEADER_VALUE_MAP.get(python_type)
-
+            # Process parameter
+            param_dict = self._process_parameter(parameter)
             params.append(param_dict)
 
         return params
-
-    @staticmethod
-    def _normalize_swagger_path(path: str) -> str:
-        """
-        Normalize path parameters in swagger path.
-
-        Args:
-            path: Original path with parameters
-
-        Returns:
-            Normalized path with snake_case parameters
-        """
-
-        def replace_placeholder(match: re.Match) -> str:
-            placeholder = match.group(0)[1:-1]
-            return "{" + rename_python_builtins(name_to_snake(placeholder)) + "}" if placeholder else ""
-
-        return re.sub(r"\{[^}]*\}", replace_placeholder, path)
 
     def parse_openapi_spec(self) -> list[Handler]:
         """
@@ -597,3 +629,21 @@ class OpenAPISpec:
     def handler_by_path(self, path: str) -> list[Handler]:
         """Get handlers filtered by path."""
         return [h for h in self.handlers if h.path == path]
+
+    @staticmethod
+    def _normalize_swagger_path(path: str) -> str:
+        """
+        Normalize path parameters in swagger path.
+
+        Args:
+            path: Original path with parameters
+
+        Returns:
+            Normalized path with snake_case parameters
+        """
+
+        def replace_placeholder(match: re.Match) -> str:
+            placeholder = match.group(0)[1:-1]
+            return "{" + NamingUtils.to_param_name(placeholder) + "}" if placeholder else ""
+
+        return re.sub(r"\{[^}]*\}", replace_placeholder, path)

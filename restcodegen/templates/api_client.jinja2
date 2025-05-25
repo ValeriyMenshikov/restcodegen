@@ -8,7 +8,6 @@
 
 from typing import Any
 from httpx import Response
-from typing import Any
 {% if async_mode %}
 from restcodegen.restclient import AsyncClient
 {% else %}
@@ -17,13 +16,13 @@ from restcodegen.restclient import Client
 {% if models %}
 from clients.http.{{ service_name|to_snake_case }}.models.api_models import (
     {% for model in models %}
-    {{ model }},
+    {{ model|to_class_name }},
     {% endfor %}
 )
 {% endif %}
 
 
-class {{ api_name|to_camel_case }}Api:
+class {{ api_name|to_pascal_case }}Api:
 
     def __init__(self, api_client: {% if async_mode %}AsyncClient{% else %}Client{% endif %}) -> None:
         self.api_client = api_client
@@ -43,76 +42,76 @@ class {{ api_name|to_camel_case }}Api:
     {% if async_mode %}async {% endif %}def {{ method }}_{{ path|to_snake_case }}(
         self,
         {%- if request_body %}
-        {{ request_body|to_snake_case }}: {{ request_body }}, # noqa: E501
+        {{ request_body|to_param_name }}: {{ request_body|to_class_name }}, # noqa: E501
         {%- endif %}
         {%- if path_parameters %}
-        {%- for path_param in path_parameters %}
-        {{ path_param.get('name')|to_snake_case|rename_python_builtins }}: {{ path_param.get('type') }},
+        {%- for path_param in path_parameters|sort(attribute='required', reverse=True) %}
+        {{ path_param.get('name')|to_param_name }}: {% if not path_param.get('required') %}{{ path_param.get('type')|to_type_annotation }} | None = None{% else %}{{ path_param.get('type')|to_type_annotation }}{% endif %},
         {%- endfor %}
         {%- endif %}
         {%- if query_parameters %}
-        {%- for query_param in query_parameters %}
-        {{ query_param.get('name')|to_snake_case|rename_python_builtins }}: {{ query_param.get('type') }},
+        {%- for query_param in query_parameters|sort(attribute='required', reverse=True) %}
+        {{ query_param.get('name')|to_param_name }}: {% if not query_param.get('required') %}{{ query_param.get('type')|to_type_annotation }} | None = None{% else %}{{ query_param.get('type')|to_type_annotation }}{% endif %},
         {%- endfor %}
         {%- endif %}
         {%- if headers %}
         {%- for header in headers %}
-        {{ header.get('name')|to_snake_case|rename_python_builtins }}: {{ header.get('type') }} {% if header.get('required') %}{% elif header.get('type') == 'str' %} = "" {% else %} = {{ header.get('default') }}{% endif %},
+        {{ header.get('name')|to_param_name }}: {% if not header.get('required') %}{{ header.get('type')|to_type_annotation }} | None = None{% elif header.get('type') == 'str' and not header.get('required') %} = ""{% else %}{{ header.get('type')|to_type_annotation }}{% endif %},
         {%- endfor %}
         {%- endif %}
         **kwargs: Any,
-    ) -> {{ success_response if success_response else 'Response' }}:
+    ) -> {{ success_response|to_type_annotation if success_response else 'Response' }}:
         """
         {{ summary.strip() | wordwrap(width=120) if summary else 'No summary description' }}.
 
         Args:
             {%- if request_body %}
-            {{ request_body|to_snake_case }}({{ request_body }}): ...
+            {{ request_body|to_param_name }}({{ request_body|to_class_name }}): ...
             {%- endif %}
             {%- if path_parameters %}
             {%- for path_param in path_parameters %}
-            {{ path_param.get('name')|to_snake_case|rename_python_builtins }}({{ path_param.get('type')}}{% if path_param.get('required')%}, required{% else %}, optional{% endif %}): {{ path_param.get('description', '') | wordwrap(width=50) if path_param.get('description') else '...' }}
+            {{ path_param.get('name')|to_param_name }}({{ path_param.get('type')|to_type_annotation }}{% if path_param.get('required')%}, required{% else %}, optional{% endif %}): {{ path_param.get('description', '') | wordwrap(break_long_words=false, wrapstring="\n                    ") if path_param.get('description') else '...' }}
             {%- endfor %}
             {%- endif %}
             {%- if query_parameters %}
             {%- for query_param in query_parameters %}
-            {{ query_param.get('name')|to_snake_case|rename_python_builtins }}({{ query_param.get('type') }}{% if query_param.get('required')%}, required{% else %}, optional{% endif %}): {{ query_param.get('description', '') | wordwrap(width=50) if query_param.get('description') else '...' }}
+            {{ query_param.get('name')|to_param_name }}({{ query_param.get('type')|to_type_annotation }}{% if query_param.get('required')%}, required{% else %}, optional{% endif %}): {{ query_param.get('description', '') | wordwrap(break_long_words=false, wrapstring="\n                    ") if query_param.get('description') else '...' }}
             {%- endfor %}
             {%- endif %}
             {%- if headers %}
             {%- for header in headers %}
-            {{ header.get('name')|to_snake_case|rename_python_builtins }}({{ header.get('type') }}{% if header.get('required')%}, required{% else %}, optional{% endif %}): {{ header.get('description', '')  | wordwrap(width=50) if header.get('description') else '...' }}
+            {{ header.get('name')|to_param_name }}({{ header.get('type')|to_type_annotation }}{% if header.get('required')%}, required{% else %}, optional{% endif %}): {{ header.get('description', '') | wordwrap(break_long_words=false, wrapstring="\n                    ") if header.get('description') else '...' }}
             {%- endfor %}
             {%- endif %}
             **kwargs: аргументы поддерживаемые библиотекой httpx (data, files, headers и т.п.)
 
         Returns:
-            {{ success_response if success_response else 'None' }}: ...
+            {{ success_response|to_type_annotation if success_response else 'None' }}: ...
         """  # noqa: D205,E501
 
         response = {%- if async_mode %}await {% endif %}self.{{ method }}_{{ path|to_snake_case }}_with_http_info(
             {%- if path_parameters %}
             {%- for path_param in path_parameters %}
-            {{ path_param.get('name')|to_snake_case|rename_python_builtins }}={{ path_param.get('name')|to_snake_case|rename_python_builtins }},
+            {{ path_param.get('name')|to_param_name }}={{ path_param.get('name')|to_param_name }},
             {%- endfor %}
             {%- endif %}
             {%- if request_body %}
-            {{ request_body|to_snake_case }}={{ request_body|to_snake_case }}, # noqa: E501
+            {{ request_body|to_param_name }}={{ request_body|to_param_name }}, # noqa: E501
             {%- endif %}
             {%- if query_parameters %}
             {%- for query_param in query_parameters %}
-            {{ query_param.get('name')|to_snake_case|rename_python_builtins }}={{ query_param.get('name')|to_snake_case|rename_python_builtins }},
+            {{ query_param.get('name')|to_param_name }}={{ query_param.get('name')|to_param_name }},
             {%- endfor %}
             {%- endif %}
             {%- if headers %}
             {%- for header in headers %}
-            {{ header.get('name')|to_snake_case|rename_python_builtins }}={{ header.get('name')|to_snake_case|rename_python_builtins }},
+            {{ header.get('name')|to_param_name }}={{ header.get('name')|to_param_name }},
             {%- endfor %}
             {%- endif %}
             **kwargs,
         )
         {%- if success_response %}
-        return {{ success_response }}.model_validate_json(response.text)
+        return {{ success_response|to_class_name }}.model_validate_json(response.text)
         {%- else %}
         return response
         {%- endif %}
@@ -121,21 +120,21 @@ class {{ api_name|to_camel_case }}Api:
     {% if async_mode %}async {% endif %}def {{ method }}_{{ path|to_snake_case }}_with_http_info(
         self,
         {%- if request_body %}
-        {{ request_body|to_snake_case }}: {{ request_body }}, # noqa: E501
+        {{ request_body|to_param_name }}: {{ request_body|to_class_name }}, # noqa: E501
         {%- endif %}
         {%- if path_parameters %}
-        {%- for path_param in path_parameters %}
-        {{ path_param.get('name')|to_snake_case|rename_python_builtins }}: {{ path_param.get('type') }},
+        {%- for path_param in path_parameters|sort(attribute='required', reverse=True) %}
+        {{ path_param.get('name')|to_param_name }}: {% if not path_param.get('required') %}{{ path_param.get('type')|to_type_annotation }} | None = None{% else %}{{ path_param.get('type')|to_type_annotation }}{% endif %},
         {%- endfor %}
         {%- endif %}
         {%- if query_parameters %}
-        {%- for query_param in query_parameters %}
-        {{ query_param.get('name')|to_snake_case|rename_python_builtins }}: {{ query_param.get('type') }},
+        {%- for query_param in query_parameters|sort(attribute='required', reverse=True) %}
+        {{ query_param.get('name')|to_param_name }}: {% if not query_param.get('required') %}{{ query_param.get('type')|to_type_annotation }} | None = None{% else %}{{ query_param.get('type')|to_type_annotation }}{% endif %},
         {%- endfor %}
         {%- endif %}
         {%- if headers %}
         {%- for header in headers %}
-        {{ header.get('name')|to_snake_case|rename_python_builtins }}: {{ header.get('type') }} {% if header.get('required') %}{% elif header.get('type') == 'str' %} = "" {% else %} = {{ header.get('default') }}{% endif %},
+        {{ header.get('name')|to_param_name }}: {% if not header.get('required') %}{{ header.get('type')|to_type_annotation }} | None = None{% elif header.get('type') == 'str' and not header.get('required') %} = ""{% else %}{{ header.get('type')|to_type_annotation }}{% endif %},
         {%- endfor %}
         {%- endif %}
         **kwargs: Any,
@@ -145,21 +144,21 @@ class {{ api_name|to_camel_case }}Api:
 
         Args:
             {%- if request_body %}
-            {{ request_body|to_snake_case }}({{ request_body }}): ...
+            {{ request_body|to_param_name }}({{ request_body|to_class_name }}): ...
             {%- endif %}
             {%- if path_parameters %}
             {%- for path_param in path_parameters %}
-            {{ path_param.get('name')|to_snake_case|rename_python_builtins }}({{ path_param.get('type')}}{% if path_param.get('required')%}, required{% else %}, optional{% endif %}): {{ path_param.get('description', '') | wordwrap(width=50) if path_param.get('description') else '...' }}
+            {{ path_param.get('name')|to_param_name }}({{ path_param.get('type')|to_type_annotation }}{% if path_param.get('required')%}, required{% else %}, optional{% endif %}): {{ path_param.get('description', '') | wordwrap(break_long_words=false, wrapstring="\n                    ") if path_param.get('description') else '...' }}
             {%- endfor %}
             {%- endif %}
             {%- if query_parameters %}
             {%- for query_param in query_parameters %}
-            {{ query_param.get('name')|to_snake_case|rename_python_builtins }}({{ query_param.get('type') }}{% if query_param.get('required')%}, required{% else %}, optional{% endif %}): {{ query_param.get('description', '') | wordwrap(width=50) if query_param.get('description') else '...' }}
+            {{ query_param.get('name')|to_param_name }}({{ query_param.get('type')|to_type_annotation }}{% if query_param.get('required')%}, required{% else %}, optional{% endif %}): {{ query_param.get('description', '') | wordwrap(break_long_words=false, wrapstring="\n                    ") if query_param.get('description') else '...' }}
             {%- endfor %}
             {%- endif %}
             {%- if headers %}
             {%- for header in headers %}
-            {{ header.get('name')|to_snake_case|rename_python_builtins }}({{ header.get('type') }}{% if header.get('required')%}, required{% else %}, optional{% endif %}): {{ header.get('description', '')  | wordwrap(width=50) if header.get('description') else '...' }}
+            {{ header.get('name')|to_param_name }}({{ header.get('type')|to_type_annotation }}{% if header.get('required')%}, required{% else %}, optional{% endif %}): {{ header.get('description', '') | wordwrap(break_long_words=false, wrapstring="\n                    ") if header.get('description') else '...' }}
             {%- endfor %}
             {%- endif %}
             **kwargs: аргументы поддерживаемые библиотекой httpx (data, files, headers и т.п.)
@@ -171,20 +170,20 @@ class {{ api_name|to_camel_case }}Api:
         # process the query parameters
         params_map = {
             {%- for query_param in query_parameters %}
-            "{{ query_param.get('name') }}": {{ query_param.get('name')|to_snake_case|rename_python_builtins }},
+            "{{ query_param.get('name') }}": {{ query_param.get('name')|to_param_name }},
             {%- endfor %}
             }
-        params = {k: v for k, v in params_map.items() if v}
+        params = {k: v for k, v in params_map.items() if v is not None}
         {%- endif %}
 
         {%- if headers %}
         # process the header parameters
         headers_map = {
             {%- for header in headers %}
-            "{{ header.get('name') }}": str({{ header.get('name')|to_snake_case|rename_python_builtins }}),
+            "{{ header.get('name') }}": str({{ header.get('name')|to_param_name }}),
             {%- endfor %}
         }
-        headers = {k: str(v) for k, v in headers_map.items() if v}
+        headers = {k: str(v) for k, v in headers_map.items() if v is not None}
 
         headers_from_kwargs = kwargs.pop("headers", {})
         if headers_from_kwargs:
@@ -194,7 +193,7 @@ class {{ api_name|to_camel_case }}Api:
         {%- endif %}
 
         {% if request_body %}
-        content = {{ request_body|to_snake_case }}.model_dump_json(exclude_none=True, by_alias=True) # noqa: E501
+        content = {{ request_body|to_param_name }}.model_dump_json(exclude_none=True, by_alias=True) # noqa: E501
         headers.update({"Content-Type": "application/json"})
         {%- endif %}
 
@@ -203,7 +202,7 @@ class {{ api_name|to_camel_case }}Api:
             url=f"{{ path }}",
             {%- endif %}
             {%- if request_body %}
-            content=content,
+            json=content,
             {%- endif %}
             {%- if query_parameters %}
             params=params,
