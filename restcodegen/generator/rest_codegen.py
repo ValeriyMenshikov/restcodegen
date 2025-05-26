@@ -43,7 +43,6 @@ class RESTClientGenerator(BaseTemplateGenerator):
         """Generate __init__.py file for the APIs package."""
         LOGGER.info("Generating __init__.py for APIs")
         service_name_snake = NamingUtils.to_snake_case(self.openapi_spec.service_name)
-        
         rendered_code = self.env.get_template("apis_init.jinja2").render(
             api_names=self.openapi_spec.apis,
             service_name=self.openapi_spec.service_name,

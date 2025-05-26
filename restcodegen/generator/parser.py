@@ -1,6 +1,7 @@
 """
 OpenAPI specification parser for REST code generation.
 """
+
 import json
 import re
 from enum import Enum
@@ -11,18 +12,20 @@ from typing import (
 )
 
 import httpx
-from pydantic import BaseModel, \
-    Field, \
-    HttpUrl
+from pydantic import BaseModel, Field, HttpUrl
 
 from restcodegen.generator.log import LOGGER
-from restcodegen.generator.utils import name_to_snake, \
-    snake_to_camel, \
-    rename_python_builtins, \
-    NamingUtils
+from restcodegen.generator.utils import (
+    name_to_snake,
+    snake_to_camel,
+    rename_python_builtins,
+    NamingUtils,
+)
+
 
 class ParamType(str, Enum):
     """Parameter types in OpenAPI spec."""
+
     HEADER = "header"
     PATH = "path"
     QUERY = "query"
@@ -45,12 +48,13 @@ DEFAULT_HEADER_VALUE_MAP: dict[str, Any] = {
     "int": 0,
     "float": 0.0,
     "str": "",
-    "bool": True
+    "bool": True,
 }
 
 
 class ParameterDict(TypedDict, total=False):
     """Type definition for parameter dictionaries."""
+
     name: str
     type: str
     description: str
@@ -60,16 +64,23 @@ class ParameterDict(TypedDict, total=False):
 
 class Handler(BaseModel):
     """Handler model representing an API endpoint."""
+
     path: str = Field(..., description="API endpoint path")
     method: str = Field(..., description="HTTP method")
     tags: list[str] = Field(..., description="API tags")
     summary: str | None = Field(None, description="Endpoint summary")
     operation_id: str | None = Field(None, description="Operation ID")
-    path_parameters: list[dict[str, Any]] | None = Field(None, description="Path parameters")
-    query_parameters: list[dict[str, Any]] | None = Field(None, description="Query parameters")
+    path_parameters: list[dict[str, Any]] | None = Field(
+        None, description="Path parameters"
+    )
+    query_parameters: list[dict[str, Any]] | None = Field(
+        None, description="Query parameters"
+    )
     headers: list[dict[str, Any]] | None = Field(None, description="Header parameters")
     request_body: str | None = Field(None, description="Request body model name")
-    responses: dict[str, str] | None = Field(None, description="Response models by status code")
+    responses: dict[str, str] | None = Field(
+        None, description="Response models by status code"
+    )
 
     def get(self, key: str, default: Any = None) -> Any:
         """Get attribute by name with default fallback."""
@@ -81,14 +92,15 @@ class OpenAPISpec:
     OpenAPI specification parser that loads and processes OpenAPI/Swagger specifications.
     Supports both OpenAPI 3.x and Swagger 2.x formats.
     """
+
     BASE_PATH = Path.cwd() / "clients" / "http"
     EXCLUDED_PARAMS = ["x-o3-app-name"]
 
     def __init__(
-            self,
-            openapi_spec: str | HttpUrl,
-            service_name: str,
-            api_tags: list[str] | None = None,
+        self,
+        openapi_spec: str | HttpUrl,
+        service_name: str,
+        api_tags: list[str] | None = None,
     ) -> None:
         """
         Initialize OpenAPI specification parser.
@@ -101,7 +113,9 @@ class OpenAPISpec:
         self.spec_path = str(openapi_spec)
         self.service_name = service_name
         self.cache_spec_dir = self._ensure_cache_dir()
-        self.cache_spec_path = self.cache_spec_dir / f"{name_to_snake(self.service_name)}.json"
+        self.cache_spec_path = (
+            self.cache_spec_dir / f"{name_to_snake(self.service_name)}.json"
+        )
 
         # Parse OpenAPI spec
         self.openapi_spec: dict[str, Any] = self._load_spec()
@@ -287,14 +301,20 @@ class OpenAPISpec:
         Returns:
             Model name or None if no valid reference
         """
-        if not schema_ref or "#/definitions/" not in schema_ref and "#/components/schemas/" not in schema_ref:
+        if (
+            not schema_ref
+            or "#/definitions/" not in schema_ref
+            and "#/components/schemas/" not in schema_ref
+        ):
             return None
 
         # Use NamingUtils to ensure consistent class naming
         model_name = NamingUtils.to_class_name(schema_ref.split("/")[-1])
         return model_name
 
-    def _get_request_body(self, request_body: dict[str, Any] | list[dict[str, Any]]) -> str | None:
+    def _get_request_body(
+        self, request_body: dict[str, Any] | list[dict[str, Any]]
+    ) -> str | None:
         """
         Extract request body model from OpenAPI spec.
 
@@ -351,8 +371,7 @@ class OpenAPISpec:
             for status_code, response_spec in response_body.items():
                 for content_type in response_spec.get("content", {}).keys():
                     schema_ref = (
-                        response_spec
-                        .get("content", {})
+                        response_spec.get("content", {})
                         .get(content_type, {})
                         .get("schema", {})
                         .get("$ref")
@@ -366,7 +385,9 @@ class OpenAPISpec:
         # Handle Swagger 2.0 format
         elif self.openapi_version.startswith("2."):
             for status_code, response in response_body.items():
-                schema_ref = response.get("schema", {}).get("$ref") or response.get("schema", {}).get("result")
+                schema_ref = response.get("schema", {}).get("$ref") or response.get(
+                    "schema", {}
+                ).get("result")
 
                 model_name = self._extract_model_name(schema_ref)
                 if model_name:
@@ -450,7 +471,9 @@ class OpenAPISpec:
 
         return param_dict
 
-    def _get_parameters(self, parameters: list[dict[str, Any]], param_type: ParamType) -> list[ParameterDict]:
+    def _get_parameters(
+        self, parameters: list[dict[str, Any]], param_type: ParamType
+    ) -> list[ParameterDict]:
         """
         Extract parameters of specified type from OpenAPI spec.
 
@@ -463,7 +486,9 @@ class OpenAPISpec:
         """
         return self._get_params_with_types(parameters, param_type)
 
-    def _get_params_with_types(self, parameters: list[dict[str, Any]], param_type: ParamType) -> list[ParameterDict]:
+    def _get_params_with_types(
+        self, parameters: list[dict[str, Any]], param_type: ParamType
+    ) -> list[ParameterDict]:
         """
         Process parameters and extract type information.
 
@@ -506,10 +531,9 @@ class OpenAPISpec:
         info = self.openapi_spec.get("info", {})
         self.version = info.get("version", "1.0.0")
         self.description = info.get("description", "")
-        self.openapi_version = (
-                self.openapi_spec.get("openapi", "") or
-                self.openapi_spec.get("swagger", "")
-        )
+        self.openapi_version = self.openapi_spec.get(
+            "openapi", ""
+        ) or self.openapi_spec.get("swagger", "")
 
         # Warn about unsupported versions
         if self.openapi_version.startswith("2."):
@@ -537,7 +561,7 @@ class OpenAPISpec:
             details: Method details
         """
         # Extract tags and add to all_tags
-        tags = details.get("tags", [])
+        tags = [NamingUtils.to_class_name(NamingUtils.to_snake_case(tag)) for tag in details.get("tags", [])]
         self.all_tags.update(tags)
 
         # Extract basic metadata
@@ -644,6 +668,10 @@ class OpenAPISpec:
 
         def replace_placeholder(match: re.Match) -> str:
             placeholder = match.group(0)[1:-1]
-            return "{" + NamingUtils.to_param_name(placeholder) + "}" if placeholder else ""
+            return (
+                "{" + NamingUtils.to_param_name(placeholder) + "}"
+                if placeholder
+                else ""
+            )
 
         return re.sub(r"\{[^}]*\}", replace_placeholder, path)
