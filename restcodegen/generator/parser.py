@@ -402,6 +402,14 @@ class OpenAPISpec:
             if ref:
                 return self._extract_model_name(ref)
 
+            # Handle allOf with $ref in schema
+            all_of = schema.get("allOf")
+            if all_of and isinstance(all_of, list):
+                for item in all_of:
+                    ref = item.get("$ref")
+                    if ref:
+                        return self._extract_model_name(ref)
+
             # Handle arrays
             items = schema.get("items", {})
             if items:
