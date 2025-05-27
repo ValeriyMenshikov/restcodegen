@@ -5,8 +5,9 @@ from datamodel_code_generator import DataModelType, generate
 
 from restcodegen.generator.base import BaseTemplateGenerator
 from restcodegen.generator.log import LOGGER
+from restcodegen.generator.naming import NamingUtils
 from restcodegen.generator.parser import OpenAPISpec
-from restcodegen.generator.utils import create_and_write_file, NamingUtils
+from restcodegen.generator.utils import create_and_write_file
 
 
 class RESTClientGenerator(BaseTemplateGenerator):

@@ -15,12 +15,7 @@ import httpx
 from pydantic import BaseModel, Field, HttpUrl
 
 from restcodegen.generator.log import LOGGER
-from restcodegen.generator.utils import (
-    name_to_snake,
-    snake_to_camel,
-    rename_python_builtins,
-    NamingUtils,
-)
+from restcodegen.generator.naming import NamingUtils
 
 
 class ParamType(str, Enum):
@@ -41,14 +36,6 @@ TYPE_MAP: dict[str, str] = {
     "array": "list",
     "anyof": "str",
     "none": "Any",
-}
-
-# Default values for header parameters
-DEFAULT_HEADER_VALUE_MAP: dict[str, Any] = {
-    "int": 0,
-    "float": 0.0,
-    "str": "",
-    "bool": True,
 }
 
 
@@ -114,7 +101,7 @@ class OpenAPISpec:
         self.service_name = service_name
         self.cache_spec_dir = self._ensure_cache_dir()
         self.cache_spec_path = (
-            self.cache_spec_dir / f"{name_to_snake(self.service_name)}.json"
+            self.cache_spec_dir / f"{NamingUtils.to_snake_case(self.service_name)}.json"
         )
 
         # Parse OpenAPI spec

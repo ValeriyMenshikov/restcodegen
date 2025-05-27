@@ -5,7 +5,8 @@ from jinja2 import Environment, FileSystemLoader
 
 from restcodegen.generator import TEMPLATES
 from restcodegen.generator.log import LOGGER
-from restcodegen.generator.utils import NamingUtils, get_version
+from restcodegen.generator.naming import NamingUtils
+from restcodegen.generator.utils import get_version
 
 
 class BaseGenerator:
