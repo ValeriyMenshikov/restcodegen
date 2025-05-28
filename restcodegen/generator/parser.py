@@ -740,6 +740,9 @@ class OpenAPISpec:
         path_parameters = self._get_parameters(parameters, ParamType.PATH)
         headers = self._get_parameters(parameters, ParamType.HEADER)
 
+        if not path_parameters:
+            path_parameters = self._extract_path_params_from_url(path)
+
         # Process request body and responses
         request_body_data = details.get("requestBody", details.get("parameters", {}))
         # Добавляем operation_id в request_body_data для использования в _get_request_body
@@ -777,6 +780,24 @@ class OpenAPISpec:
             responses=responses,
         )
         self.handlers.append(handler)
+
+    @staticmethod
+    def _extract_path_params_from_url(path: str) -> list:
+        params = []
+        path_params = re.findall(r"\{([^}]+)\}", path)
+
+        for param in path_params:
+            param_name = NamingUtils.to_snake_case(param)
+            params.append(
+                {
+                    "name": param_name,
+                    "type": "str",
+                    "description": f"Path parameter: {param_name}",
+                    "required": True,
+                }
+            )
+
+        return params
 
     def models_by_tag(self, tag: str) -> set[str]:
         """

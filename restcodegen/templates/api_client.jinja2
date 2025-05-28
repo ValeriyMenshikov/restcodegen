@@ -47,56 +47,51 @@ class {{ api_name|to_pascal_case }}Api:
 
     {% if async_mode %}async {% endif %}def {{ method }}_{{ path|to_snake_case }}(
         self,
+        {%- set all_params = [] %}
         {%- if content_type == 'multipart/form-data' and form_data_parameters %}
-        {%- for form_param in form_data_parameters|sort(attribute='required', reverse=True) %}
-        {{ form_param.name|to_param_name }}: {% if not form_param.required %}{{ form_param.type|to_type_annotation }} | None = None{% else %}{{ form_param.type|to_type_annotation }}{% endif %},
+        {%- for form_param in form_data_parameters %}
+        {%- set _ = all_params.append({'type': 'form', 'param': form_param}) %}
         {%- endfor %}
         {%- elif request_body %}
-        {{ request_body_param_name }}: {{ request_body|to_class_name }},
+        {%- set _ = all_params.append({'type': 'body', 'param': {'name': request_body_param_name, 'type': request_body|to_class_name, 'required': true}}) %}
         {%- endif %}
         {%- if path_parameters %}
-        {%- for path_param in path_parameters|sort(attribute='required', reverse=True) %}
-        {{ path_param.name|to_param_name }}: {% if not path_param.required %}{{ path_param.type|to_type_annotation }} | None = None{% else %}{{ path_param.type|to_type_annotation }}{% endif %},
+        {%- for path_param in path_parameters %}
+        {%- set _ = all_params.append({'type': 'path', 'param': path_param}) %}
         {%- endfor %}
         {%- endif %}
         {%- if query_parameters %}
-        {%- for query_param in query_parameters|sort(attribute='required', reverse=True) %}
-        {{ query_param.name|to_param_name }}: {% if not query_param.required %}{{ query_param.type|to_type_annotation }} | None = None{% else %}{{ query_param.type|to_type_annotation }}{% endif %},
+        {%- for query_param in query_parameters %}
+        {%- set _ = all_params.append({'type': 'query', 'param': query_param}) %}
         {%- endfor %}
         {%- endif %}
         {%- if headers %}
         {%- for header in headers %}
-        {{ header.name|to_param_name }}: {% if not header.required %}{{ header.type|to_type_annotation }} | None = None{% elif header.type == 'str' and not header.required %} = ""{% else %}{{ header.type|to_type_annotation }}{% endif %},
+        {%- set _ = all_params.append({'type': 'header', 'param': header}) %}
         {%- endfor %}
         {%- endif %}
+        {%- for param_data in all_params|sort(attribute='param.required', reverse=True) %}
+        {%- set param = param_data.param %}
+        {%- if param_data.type == 'body' %}
+        {{ param.name }}: {{ param.type }},
+        {%- else %}
+        {{ param.name|to_param_name }}: {% if not param.required %}{{ param.type|to_type_annotation }} | None = None{% elif param.type == 'str' and not param.required %} = ""{% else %}{{ param.type|to_type_annotation }}{% endif %},
+        {%- endif %}
+        {%- endfor %}
         **kwargs: Any,
     ) -> {{ success_response|to_type_annotation if success_response else 'Response' }}:
         """
         {{ summary.strip() | wordwrap(width=120) if summary else 'No summary description' }}.
 
         Args:
-            {%- if content_type == 'multipart/form-data' and form_data_parameters %}
-            {%- for form_param in form_data_parameters %}
-            {{ form_param.name|to_param_name }}({{ form_param.type|to_type_annotation }}{% if form_param.required%}, required{% else %}, optional{% endif %}): {{ form_param.description | wordwrap(break_long_words=false, wrapstring="\n                    ") if form_param.description else '...' }}
-            {%- endfor %}
-            {%- elif request_body %}
-            {{ request_body_param_name }}({{ request_body|to_class_name }}): ...
+            {%- for param_data in all_params %}
+            {%- set param = param_data.param %}
+            {%- if param_data.type == 'body' %}
+            {{ param.name }}({{ param.type }}): ...
+            {%- else %}
+            {{ param.name|to_param_name }}({{ param.type|to_type_annotation }}{% if param.required%}, required{% else %}, optional{% endif %}): {{ param.description | wordwrap(break_long_words=false, wrapstring="\n                    ") if param.description else '...' }}
             {%- endif %}
-            {%- if path_parameters %}
-            {%- for path_param in path_parameters %}
-            {{ path_param.name|to_param_name }}({{ path_param.type|to_type_annotation }}{% if path_param.required%}, required{% else %}, optional{% endif %}): {{ path_param.description | wordwrap(break_long_words=false, wrapstring="\n                    ") if path_param.description else '...' }}
             {%- endfor %}
-            {%- endif %}
-            {%- if query_parameters %}
-            {%- for query_param in query_parameters %}
-            {{ query_param.name|to_param_name }}({{ query_param.type|to_type_annotation }}{% if query_param.required%}, required{% else %}, optional{% endif %}): {{ query_param.description | wordwrap(break_long_words=false, wrapstring="\n                    ") if query_param.description else '...' }}
-            {%- endfor %}
-            {%- endif %}
-            {%- if headers %}
-            {%- for header in headers %}
-            {{ header.name|to_param_name }}({{ header.type|to_type_annotation }}{% if header.required%}, required{% else %}, optional{% endif %}): {{ header.description | wordwrap(break_long_words=false, wrapstring="\n                    ") if header.description else '...' }}
-            {%- endfor %}
-            {%- endif %}
             **kwargs: аргументы поддерживаемые библиотекой httpx (data, files, headers и т.п.)
 
         Returns:
@@ -104,28 +99,14 @@ class {{ api_name|to_pascal_case }}Api:
         """  # noqa: D205,E501
 
         response = {%- if async_mode %}await {% endif %}self.{{ method }}_{{ path|to_snake_case }}_with_http_info(
-            {%- if path_parameters %}
-            {%- for path_param in path_parameters %}
-            {{ path_param.name|to_param_name }}={{ path_param.name|to_param_name }},
-            {%- endfor %}
+            {%- for param_data in all_params %}
+            {%- set param = param_data.param %}
+            {%- if param_data.type == 'body' %}
+            {{ param.name }}={{ param.name }},
+            {%- else %}
+            {{ param.name|to_param_name }}={{ param.name|to_param_name }},
             {%- endif %}
-            {%- if content_type == 'multipart/form-data' and form_data_parameters %}
-            {%- for form_param in form_data_parameters %}
-            {{ form_param.name|to_param_name }}={{ form_param.name|to_param_name }},
             {%- endfor %}
-            {%- elif request_body %}
-            {{ request_body_param_name }}={{ request_body_param_name }},
-            {%- endif %}
-            {%- if query_parameters %}
-            {%- for query_param in query_parameters %}
-            {{ query_param.name|to_param_name }}={{ query_param.name|to_param_name }},
-            {%- endfor %}
-            {%- endif %}
-            {%- if headers %}
-            {%- for header in headers %}
-            {{ header.name|to_param_name }}={{ header.name|to_param_name }},
-            {%- endfor %}
-            {%- endif %}
             **kwargs,
         )
         {%- if success_response %}
@@ -137,56 +118,51 @@ class {{ api_name|to_pascal_case }}Api:
 
     {% if async_mode %}async {% endif %}def {{ method }}_{{ path|to_snake_case }}_with_http_info(
         self,
+        {%- set all_params = [] %}
         {%- if content_type == 'multipart/form-data' and form_data_parameters %}
-        {%- for form_param in form_data_parameters|sort(attribute='required', reverse=True) %}
-        {{ form_param.name|to_param_name }}: {% if not form_param.required %}{{ form_param.type|to_type_annotation }} | None = None{% else %}{{ form_param.type|to_type_annotation }}{% endif %},
+        {%- for form_param in form_data_parameters %}
+        {%- set _ = all_params.append({'type': 'form', 'param': form_param}) %}
         {%- endfor %}
         {%- elif request_body %}
-        {{ request_body_param_name }}: {{ request_body|to_class_name }},
+        {%- set _ = all_params.append({'type': 'body', 'param': {'name': request_body_param_name, 'type': request_body|to_class_name, 'required': true}}) %}
         {%- endif %}
         {%- if path_parameters %}
-        {%- for path_param in path_parameters|sort(attribute='required', reverse=True) %}
-        {{ path_param.name|to_param_name }}: {% if not path_param.required %}{{ path_param.type|to_type_annotation }} | None = None{% else %}{{ path_param.type|to_type_annotation }}{% endif %},
+        {%- for path_param in path_parameters %}
+        {%- set _ = all_params.append({'type': 'path', 'param': path_param}) %}
         {%- endfor %}
         {%- endif %}
         {%- if query_parameters %}
-        {%- for query_param in query_parameters|sort(attribute='required', reverse=True) %}
-        {{ query_param.name|to_param_name }}: {% if not query_param.required %}{{ query_param.type|to_type_annotation }} | None = None{% else %}{{ query_param.type|to_type_annotation }}{% endif %},
+        {%- for query_param in query_parameters %}
+        {%- set _ = all_params.append({'type': 'query', 'param': query_param}) %}
         {%- endfor %}
         {%- endif %}
         {%- if headers %}
         {%- for header in headers %}
-        {{ header.name|to_param_name }}: {% if not header.required %}{{ header.type|to_type_annotation }} | None = None{% elif header.type == 'str' and not header.required %} = ""{% else %}{{ header.type|to_type_annotation }}{% endif %},
+        {%- set _ = all_params.append({'type': 'header', 'param': header}) %}
         {%- endfor %}
         {%- endif %}
+        {%- for param_data in all_params|sort(attribute='param.required', reverse=True) %}
+        {%- set param = param_data.param %}
+        {%- if param_data.type == 'body' %}
+        {{ param.name }}: {{ param.type }},
+        {%- else %}
+        {{ param.name|to_param_name }}: {% if not param.required %}{{ param.type|to_type_annotation }} | None = None{% elif param.type == 'str' and not param.required %} = ""{% else %}{{ param.type|to_type_annotation }}{% endif %},
+        {%- endif %}
+        {%- endfor %}
         **kwargs: Any,
     ) -> Response:
         """
         {{ summary.strip() | wordwrap(width=120) if summary else 'No summary description' }}.
 
         Args:
-            {%- if content_type == 'multipart/form-data' and form_data_parameters %}
-            {%- for form_param in form_data_parameters %}
-            {{ form_param.name|to_param_name }}({{ form_param.type|to_type_annotation }}{% if form_param.required%}, required{% else %}, optional{% endif %}): {{ form_param.description | wordwrap(break_long_words=false, wrapstring="\n                    ") if form_param.description else '...' }}
-            {%- endfor %}
-            {%- elif request_body %}
-            {{ request_body_param_name }}({{ request_body|to_class_name }}): ...
+            {%- for param_data in all_params %}
+            {%- set param = param_data.param %}
+            {%- if param_data.type == 'body' %}
+            {{ param.name }}({{ param.type }}): ...
+            {%- else %}
+            {{ param.name|to_param_name }}({{ param.type|to_type_annotation }}{% if param.required%}, required{% else %}, optional{% endif %}): {{ param.description | wordwrap(break_long_words=false, wrapstring="\n                    ") if param.description else '...' }}
             {%- endif %}
-            {%- if path_parameters %}
-            {%- for path_param in path_parameters %}
-            {{ path_param.name|to_param_name }}({{ path_param.type|to_type_annotation }}{% if path_param.required%}, required{% else %}, optional{% endif %}): {{ path_param.description | wordwrap(break_long_words=false, wrapstring="\n                    ") if path_param.description else '...' }}
             {%- endfor %}
-            {%- endif %}
-            {%- if query_parameters %}
-            {%- for query_param in query_parameters %}
-            {{ query_param.name|to_param_name }}({{ query_param.type|to_type_annotation }}{% if query_param.required%}, required{% else %}, optional{% endif %}): {{ query_param.description | wordwrap(break_long_words=false, wrapstring="\n                    ") if query_param.description else '...' }}
-            {%- endfor %}
-            {%- endif %}
-            {%- if headers %}
-            {%- for header in headers %}
-            {{ header.name|to_param_name }}({{ header.type|to_type_annotation }}{% if header.required%}, required{% else %}, optional{% endif %}): {{ header.description | wordwrap(break_long_words=false, wrapstring="\n                    ") if header.description else '...' }}
-            {%- endfor %}
-            {%- endif %}
             **kwargs: аргументы поддерживаемые библиотекой httpx (data, files, headers и т.п.)
 
         Returns:
@@ -219,17 +195,27 @@ class {{ api_name|to_pascal_case }}Api:
         {%- endif %}
 
         {% if content_type == 'multipart/form-data' and form_data_parameters %}
-        data = {}
-        files = {}
-        {%- for form_param in form_data_parameters %}
-        {%- if form_param.type == 'file' %}
-        files["{{ form_param.name }}"] = {{ form_param.name|to_param_name }}
-        {%- else %}
-        data["{{ form_param.name }}"] = {{ form_param.name|to_param_name }}
-        {%- endif %}
-        {%- endfor %}
+        data = {
+        {% for form_param in form_data_parameters %}
+            {%- if not form_param.type == 'file' -%}
+            "{{ form_param.name }}": {{ form_param.name|to_param_name }},
+            {%- endif %}
+        {% endfor %}
+        }
+        data = {k: v for k, v in data[:].items() if v is not None}
+
+        {% elif content_type != 'multipart/form-data' and form_data_parameters %}
+        files = {
+        {% for form_param in form_data_parameters %}
+            {%- if form_param.type == 'file' -%}
+            "{{ form_param.name }}": {{ form_param.name|to_param_name }},
+            {%- endif %}
+        {% endfor %}
+        }
+        files = {k: v for k, v in files[:].items() if v is not None}
+
         {%- elif request_body %}
-        content = {{ request_body_param_name }}.model_dump_json(exclude_none=True, by_alias=True) # noqa: E501
+        data = {{ request_body_param_name }}.model_dump_json(exclude_none=True, by_alias=True) # noqa: E501
         headers.update({"Content-Type": "application/json"})
         {%- endif %}
 
@@ -239,9 +225,10 @@ class {{ api_name|to_pascal_case }}Api:
             {%- endif %}
             {%- if content_type == 'multipart/form-data' and form_data_parameters %}
             data=data,
+            {%- elif content_type != 'multipart/form-data' and form_data_parameters %}
             files=files,
             {%- elif request_body %}
-            json=content,
+            data=data,
             {%- endif %}
             {%- if query_parameters %}
             params=params,
