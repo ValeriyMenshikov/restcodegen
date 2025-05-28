@@ -5,7 +5,6 @@ import builtins
 import keyword
 from typing import Any
 
-
 class NamingUtils:
     """Utilities for consistent naming conventions across generated code."""
 
@@ -17,7 +16,8 @@ class NamingUtils:
         string = re.sub(r"([A-Z]+)([A-Z][a-z])", r"\1_\2", string)
         string = re.sub(r"([a-z\d])([A-Z])", r"\1_\2", string)
         string = re.sub('&', 'and', string)
-        string = string.replace("-", "_").lower().strip("_")
+        string = string.replace("-", "_").lower()
+        string = string.strip("_") if len(string) > 1 else string
         return string
 
     @staticmethod
@@ -158,7 +158,7 @@ class NamingUtils:
     @classmethod
     def to_type_annotation(cls, string: str) -> str:
         """Convert a string to be used as a type annotation."""
-        basic_types = ["int", "str", "bool", "float", "list", "dict", "tuple", "set", "Any", "None"]
+        basic_types = ["int", "str", "bool", "float", "list", "dict", "tuple", "set", "Any", "None", "bytes"]
         if string in basic_types:
             return string
         if "[" in string and "]" in string:
