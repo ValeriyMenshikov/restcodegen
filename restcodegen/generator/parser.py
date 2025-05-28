@@ -65,6 +65,10 @@ class Handler(BaseModel):
     )
     headers: list[dict[str, Any]] | None = Field(None, description="Header parameters")
     request_body: str | None = Field(None, description="Request body model name")
+    content_type: str | None = Field(None, description="Request content type")
+    form_data_parameters: list[dict[str, Any]] | None = Field(
+        None, description="Form data parameters for multipart/form-data requests"
+    )
     responses: dict[str, str] | None = Field(
         None, description="Response models by status code"
     )
@@ -301,7 +305,7 @@ class OpenAPISpec:
 
     def _get_request_body(
         self, request_body: dict[str, Any] | list[dict[str, Any]]
-    ) -> str | None:
+    ) -> tuple[str | None, str | None]:
         """
         Extract request body model from OpenAPI spec.
 
@@ -309,8 +313,13 @@ class OpenAPISpec:
             request_body: Request body specification
 
         Returns:
-            Model name or None if no request body
+            Tuple of (model_name, content_type) or (None, None) if no request body
         """
+        # Extract operation_id if present
+        operation_id = ""
+        if isinstance(request_body, dict) and "operation_id" in request_body:
+            operation_id = request_body.pop("operation_id")
+            
         # Handle Swagger 2.0 format (list of parameters)
         if isinstance(request_body, list):
             for parameter in request_body:
@@ -320,23 +329,79 @@ class OpenAPISpec:
                         model_name = self._extract_model_name(schema_ref)
                         if model_name:
                             self.request_models.add(model_name)
-                            return model_name
+                            return model_name, "application/json"
+                    
+                    # Handle inline schema in Swagger 2.0
+                    schema = parameter.get("schema", {})
+                    if schema.get("type") == "object" and schema.get("properties"):
+                        model_name = self._generate_inline_model_name(operation_id, parameter.get("name", ""))
+                        self._create_inline_model(schema, model_name)
+                        self.request_models.add(model_name)
+                        return model_name, "application/json"
         # Handle OpenAPI 3.0 format
         else:
             for content_type in request_body.get("content", {}).keys():
-                schema_ref = (
+                schema = (
                     request_body.get("content", {})
                     .get(content_type, {})
                     .get("schema", {})
-                    .get("$ref")
                 )
+                
+                # Проверяем наличие $ref
+                schema_ref = schema.get("$ref")
                 if schema_ref:
                     model_name = self._extract_model_name(schema_ref)
                     if model_name:
                         self.request_models.add(model_name)
-                        return model_name
+                        return model_name, content_type
+                
+                # Обработка встроенных схем (inline schemas)
+                if schema.get("type") == "object" and schema.get("properties"):
+                    model_name = self._generate_inline_model_name(operation_id)
+                    self._create_inline_model(schema, model_name)
+                    self.request_models.add(model_name)
+                    return model_name, content_type
 
-        return None
+        return None, None
+
+    def _generate_inline_model_name(self, operation_id: str, param_name: str = "") -> str:
+        """
+        Generate a model name for an inline schema.
+        
+        Args:
+            operation_id: Operation ID from the API endpoint
+            param_name: Parameter name (if available)
+            
+        Returns:
+            Generated model name
+        """
+        if operation_id:
+            return f"{NamingUtils.to_pascal_case(operation_id)}Request"
+        elif param_name:
+            return f"{NamingUtils.to_pascal_case(param_name)}Model"
+        else:
+            return "RequestBodyModel"
+            
+    def _create_inline_model(self, schema: dict[str, Any], model_name: str) -> None:
+        """
+        Create a model definition from an inline schema.
+        
+        Args:
+            schema: Schema object containing properties
+            model_name: Name for the generated model
+        """
+        # Store the schema in the components/schemas section for the model generator to find
+        if "components" not in self.openapi_spec:
+            self.openapi_spec["components"] = {}
+        
+        if "schemas" not in self.openapi_spec["components"]:
+            self.openapi_spec["components"]["schemas"] = {}
+            
+        # Add the schema to the components section
+        self.openapi_spec["components"]["schemas"][model_name] = schema
+        
+        # Log the creation of the inline model
+        LOGGER.info(f"Created inline model: {model_name}")
 
     def _get_response_body(self, response_body: dict[str, Any]) -> dict[str, str]:
         """
@@ -352,36 +417,89 @@ class OpenAPISpec:
 
         if not response_body:
             return responses
+            
+        # Extract operation_id and remove it from response_body to avoid iteration issues
+        operation_id = ""
+        if "operation_id" in response_body:
+            operation_id = response_body.pop("operation_id")
 
         # Handle OpenAPI 3.0 format
         if self.openapi_version.startswith("3."):
             for status_code, response_spec in response_body.items():
                 for content_type in response_spec.get("content", {}).keys():
-                    schema_ref = (
+                    schema = (
                         response_spec.get("content", {})
                         .get(content_type, {})
                         .get("schema", {})
-                        .get("$ref")
                     )
-
-                    model_name = self._extract_model_name(schema_ref)
-                    if model_name:
+                    
+                    # Handle schema reference
+                    schema_ref = schema.get("$ref")
+                    if schema_ref:
+                        model_name = self._extract_model_name(schema_ref)
+                        if model_name:
+                            responses[status_code] = model_name
+                            self.response_models.add(model_name)
+                            continue
+                    
+                    # Handle inline schema
+                    if schema.get("type") == "object" and schema.get("properties"):
+                        # Generate model name based on status code
+                        model_name = self._generate_inline_response_model_name(operation_id, status_code)
+                        self._create_inline_model(schema, model_name)
                         responses[status_code] = model_name
                         self.response_models.add(model_name)
 
         # Handle Swagger 2.0 format
         elif self.openapi_version.startswith("2."):
             for status_code, response in response_body.items():
-                schema_ref = response.get("schema", {}).get("$ref") or response.get(
-                    "schema", {}
-                ).get("result")
-
-                model_name = self._extract_model_name(schema_ref)
-                if model_name:
+                schema = response.get("schema", {})
+                
+                # Handle schema reference
+                schema_ref = schema.get("$ref") or schema.get("result")
+                if schema_ref:
+                    model_name = self._extract_model_name(schema_ref)
+                    if model_name:
+                        responses[status_code] = model_name
+                        self.response_models.add(model_name)
+                        continue
+                
+                # Handle inline schema
+                if schema.get("type") == "object" and schema.get("properties"):
+                    model_name = self._generate_inline_response_model_name(operation_id, status_code)
+                    self._create_inline_model(schema, model_name)
                     responses[status_code] = model_name
                     self.response_models.add(model_name)
 
         return responses
+        
+    def _generate_inline_response_model_name(self, operation_id: str, status_code: str) -> str:
+        """
+        Generate a model name for an inline response schema.
+        
+        Args:
+            operation_id: Operation ID from the API endpoint
+            status_code: HTTP status code
+            
+        Returns:
+            Generated model name
+        """
+        status_name = {
+            "200": "Success",
+            "201": "Created",
+            "202": "Accepted",
+            "204": "NoContent",
+            "400": "BadRequest",
+            "401": "Unauthorized",
+            "403": "Forbidden",
+            "404": "NotFound",
+            "500": "ServerError"
+        }.get(status_code, f"Status{status_code}")
+        
+        if operation_id:
+            return f"{NamingUtils.to_pascal_case(operation_id)}{status_name}Response"
+        else:
+            return f"{status_name}Response"
 
     def _get_parameter_type(self, parameter: dict[str, Any]) -> str:
         """
@@ -515,6 +633,59 @@ class OpenAPISpec:
 
         return params
 
+    def _extract_form_data_parameters(
+        self, schema: dict[str, Any]
+    ) -> list[dict[str, Any]]:
+        """
+        Extract form data parameters from schema.
+
+        Args:
+            schema: Schema object containing properties
+
+        Returns:
+            List of form data parameters
+        """
+        form_params = []
+        properties = schema.get("properties", {})
+        required = schema.get("required", [])
+
+        for name, prop in properties.items():
+            param_type = prop.get("type", "string")
+            description = prop.get("description", "")
+            format_type = prop.get("format", "")
+            
+            # Определяем тип параметра на основе type и format
+            if param_type == "string" and format_type == "binary":
+                python_type = "bytes"
+            elif param_type == "integer":
+                python_type = "int"
+            elif param_type == "number":
+                python_type = "float"
+            elif param_type == "boolean":
+                python_type = "bool"
+            elif param_type == "array":
+                items_type = prop.get("items", {}).get("type", "string")
+                if items_type == "string":
+                    python_type = "list[str]"
+                elif items_type == "integer":
+                    python_type = "list[int]"
+                elif items_type == "number":
+                    python_type = "list[float]"
+                else:
+                    python_type = "list"
+            else:
+                python_type = "str"
+            
+            form_params.append({
+                "name": name,
+                "type": python_type,
+                "description": description,
+                "required": name in required,
+                "format": format_type
+            })
+            
+        return form_params
+
     def parse_openapi_spec(self) -> list[Handler]:
         """
         Parse OpenAPI specification and extract API endpoints.
@@ -570,10 +741,25 @@ class OpenAPISpec:
         headers = self._get_parameters(parameters, ParamType.HEADER)
 
         # Process request body and responses
-        request_body = self._get_request_body(
-            details.get("requestBody", details.get("parameters", {}))
-        )
-        responses = self._get_response_body(details.get("responses", {}))
+        request_body_data = details.get("requestBody", details.get("parameters", {}))
+        # Добавляем operation_id в request_body_data для использования в _get_request_body
+        if isinstance(request_body_data, dict) and operation_id:
+            request_body_data["operation_id"] = operation_id
+            
+        request_body, content_type = self._get_request_body(request_body_data)
+        
+        # Add operation_id to responses for inline model generation
+        responses_data = details.get("responses", {})
+        if operation_id:
+            responses_data["operation_id"] = operation_id
+            
+        responses = self._get_response_body(responses_data)
+
+        # Extract form data parameters
+        form_data_parameters = None
+        if content_type == "multipart/form-data" and isinstance(request_body_data, dict):
+            schema = request_body_data.get("content", {}).get("multipart/form-data", {}).get("schema", {})
+            form_data_parameters = self._extract_form_data_parameters(schema)
 
         # Create and store handler
         handler = Handler(
@@ -586,6 +772,8 @@ class OpenAPISpec:
             headers=headers,
             path_parameters=path_parameters,
             request_body=request_body,
+            content_type=content_type,
+            form_data_parameters=form_data_parameters,
             responses=responses,
         )
         self.handlers.append(handler)
