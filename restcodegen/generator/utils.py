@@ -1,5 +1,4 @@
 import importlib.metadata
-import pprint
 import re
 from functools import cache
 from pathlib import Path
@@ -8,6 +7,7 @@ from typing import Optional
 from urllib.parse import urlparse
 import builtins
 import keyword
+from datamodel_code_generator.reference import FieldNameResolver
 
 
 def is_url(path: str) -> bool:
@@ -20,16 +20,13 @@ def name_to_snake(string: str) -> str:
     string = string.replace("{", "").replace("}", "")
     string = re.sub(r"([A-Z]+)([A-Z][a-z])", r"\1_\2", string)
     string = re.sub(r"([a-z\d])([A-Z])", r"\1_\2", string)
-    string = re.sub('&', 'and', string)
+    string = re.sub("&", "and", string)
     string = string.replace("-", "_").lower().strip("_")
     return string
 
 
 def snake_to_camel(string: str) -> str:
-    words = re.findall(r"[A-Z]?[a-z]+|[A-Z]+(?![a-z])|\d+", string)
-    camel_case_words = [word[0].upper() + word[1:] for word in words if word]
-    camel_case_title = "".join(camel_case_words)
-    return camel_case_title
+    return FieldNameResolver().get_valid_name(string, upper_camel=True)
 
 
 def rename_python_builtins(name: str) -> str:
