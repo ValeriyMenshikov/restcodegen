@@ -7,7 +7,11 @@ import httpx
 from pydantic import BaseModel, Field, HttpUrl
 
 from restcodegen.generator.log import LOGGER
-from restcodegen.generator.utils import name_to_snake, snake_to_camel, rename_python_builtins
+from restcodegen.generator.utils import (
+    name_to_snake,
+    snake_to_camel,
+    rename_python_builtins,
+)
 
 TYPE_MAP = {
     "integer": "int",
@@ -288,13 +292,38 @@ class OpenAPISpec:
         return params
 
     @staticmethod
-    def _normalize_swagger_path(path: str) -> str:
+    def _normalize_swagger_path(path: str, fix_builtins: bool = True) -> str:
         def replace_placeholder(match: re.Match) -> str:
             placeholder = match.group(0)[1:-1]
-            return "{" + rename_python_builtins(name_to_snake(placeholder)) + "}" if placeholder else ""
+            if not placeholder:
+                return ""
+
+            return (
+                f"{{{rename_python_builtins(name_to_snake(placeholder))}}}"
+                if fix_builtins
+                else f"{{{name_to_snake(placeholder)}}}"
+            )
 
         normalized_path = re.sub(r"\{[^}]*\}", replace_placeholder, path)
         return normalized_path
+
+    @staticmethod
+    def _extract_path_params_from_url(path: str) -> list:
+        params = []
+        path_params = re.findall(r"\{([^}]+)\}", path)
+
+        for param in path_params:
+            param_name = name_to_snake(param)
+            params.append(
+                {
+                    "name": param_name,
+                    "type": "str",
+                    "description": f"Path parameter: {param_name}",
+                    "required": True,
+                }
+            )
+
+        return params
 
     def parse_openapi_spec(self) -> list[Handler]:
         info = self.openapi_spec.get("info", {})
@@ -332,6 +361,9 @@ class OpenAPISpec:
             details.get("requestBody", details.get("parameters", {}))
         )
         responses = self._get_response_body(details.get("responses", {}))
+
+        if not path_parameters:
+            path_parameters = self._extract_path_params_from_url(path)
 
         path_obj = Handler(
             path=self._normalize_swagger_path(path),
