@@ -7,13 +7,11 @@ from urllib.parse import urlparse
 
 
 def is_url(path: str) -> bool:
-    """Check if a string is a valid URL."""
     parsed = urlparse(path)
     return bool(parsed.scheme) and bool(parsed.netloc)
 
 
 def create_and_write_file(file_path: Path, text: str | None = None) -> None:
-    """Create a file and write content to it, creating parent directories if needed."""
     file_path.parent.mkdir(parents=True, exist_ok=True)
     if text:
         file_path.write_text(text, encoding="utf-8")
@@ -22,7 +20,6 @@ def create_and_write_file(file_path: Path, text: str | None = None) -> None:
 
 
 def run_command(command: str) -> tuple[int, str | None]:
-    """Run a shell command and return its exit code and stderr output."""
     result = subprocess.run(
         command,
         shell=True,
@@ -33,7 +30,6 @@ def run_command(command: str) -> tuple[int, str | None]:
 
 
 def format_file() -> None:
-    """Format generated code using ruff formatter and linter."""
     target_dir = "./clients/http"
     format_command = ["ruff", "format", target_dir]
     run_command(" ".join(format_command))

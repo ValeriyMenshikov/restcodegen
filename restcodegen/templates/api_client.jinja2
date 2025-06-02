@@ -1,5 +1,4 @@
 # coding: utf-8
-# ruff: noqa: E501
 {% include 'header.jinja2' %}
 
 {%- set service_name = service_name %}
@@ -17,13 +16,13 @@ from restcodegen.restclient import Client
 {% if models %}
 from clients.http.{{ service_name|to_snake_case }}.models.api_models import (
     {% for model in models %}
-    {{ model|to_class_name }},
+    {{ model|to_camel_case }},
     {% endfor %}
 )
 {% endif %}
 
 
-class {{ api_name|to_pascal_case }}Api:
+class {{ api_name|to_camel_case }}Api:
 
     def __init__(self, api_client: {% if async_mode %}AsyncClient{% else %}Client{% endif %}) -> None:
         self.api_client = api_client
@@ -53,7 +52,7 @@ class {{ api_name|to_pascal_case }}Api:
         {%- set _ = all_params.append({'type': 'form', 'param': form_param}) %}
         {%- endfor %}
         {%- elif request_body %}
-        {%- set _ = all_params.append({'type': 'body', 'param': {'name': request_body_param_name, 'type': request_body|to_class_name, 'required': true}}) %}
+        {%- set _ = all_params.append({'type': 'body', 'param': {'name': request_body_param_name, 'type': request_body|to_camel_case, 'required': true}}) %}
         {%- endif %}
         {%- if path_parameters %}
         {%- for path_param in path_parameters %}
@@ -92,7 +91,7 @@ class {{ api_name|to_pascal_case }}Api:
             {{ param.name|to_param_name }}({{ param.type|to_type_annotation }}{% if param.required%}, required{% else %}, optional{% endif %}): {{ param.description | wordwrap(break_long_words=false, wrapstring="\n                    ") if param.description else '...' }}
             {%- endif %}
             {%- endfor %}
-            **kwargs: аргументы поддерживаемые библиотекой httpx (data, files, headers и т.п.)
+            **kwargs: Arguments supported by the httpx library (data, files, headers, etc.)
 
         Returns:
             {{ success_response|to_type_annotation if success_response else 'None' }}: ...
@@ -110,7 +109,7 @@ class {{ api_name|to_pascal_case }}Api:
             **kwargs,
         )
         {%- if success_response %}
-        return {{ success_response|to_class_name }}.model_validate_json(response.text)
+        return {{ success_response|to_camel_case }}.model_validate_json(response.text)
         {%- else %}
         return response
         {%- endif %}
@@ -124,7 +123,7 @@ class {{ api_name|to_pascal_case }}Api:
         {%- set _ = all_params.append({'type': 'form', 'param': form_param}) %}
         {%- endfor %}
         {%- elif request_body %}
-        {%- set _ = all_params.append({'type': 'body', 'param': {'name': request_body_param_name, 'type': request_body|to_class_name, 'required': true}}) %}
+        {%- set _ = all_params.append({'type': 'body', 'param': {'name': request_body_param_name, 'type': request_body|to_camel_case, 'required': true}}) %}
         {%- endif %}
         {%- if path_parameters %}
         {%- for path_param in path_parameters %}
@@ -163,12 +162,12 @@ class {{ api_name|to_pascal_case }}Api:
             {{ param.name|to_param_name }}({{ param.type|to_type_annotation }}{% if param.required%}, required{% else %}, optional{% endif %}): {{ param.description | wordwrap(break_long_words=false, wrapstring="\n                    ") if param.description else '...' }}
             {%- endif %}
             {%- endfor %}
-            **kwargs: аргументы поддерживаемые библиотекой httpx (data, files, headers и т.п.)
+            **kwargs: Arguments supported by the httpx library (data, files, headers, etc.)
 
         Returns:
             Response: ...
         """  # noqa: D205,E501
-        {%- if query_parameters %}
+        {% if query_parameters %}
         # process the query parameters
         params_map = {
             {%- for query_param in query_parameters %}
@@ -176,23 +175,21 @@ class {{ api_name|to_pascal_case }}Api:
             {%- endfor %}
             }
         params = {k: v for k, v in params_map.items() if v is not None}
-        {%- endif %}
+        params.update(kwargs.pop("params", {}))
+        {% endif %}
 
-        {%- if headers %}
+        {% if headers %}
         # process the header parameters
         headers_map = {
             {%- for header in headers %}
-            "{{ header.name }}": str({{ header.name|to_param_name }}),
+            "{{ header.name }}": {{ header.name|to_param_name }},
             {%- endfor %}
         }
         headers = {k: str(v) for k, v in headers_map.items() if v is not None}
-
-        headers_from_kwargs = kwargs.pop("headers", {})
-        if headers_from_kwargs:
-            headers.update(headers_from_kwargs)
-        {%- else %}
+        headers.update(kwargs.pop("headers", {}))
+        {% else %}
         headers = kwargs.pop("headers", {})
-        {%- endif %}
+        {% endif %}
 
         {% if content_type == 'multipart/form-data' and form_data_parameters %}
         data = {

@@ -282,7 +282,8 @@ class OpenAPISpec:
             LOGGER.warning(f"OpenAPI spec not found at local path: {self.spec_path}")
             return None
 
-    def _extract_model_name(self, schema_ref: str | None) -> str | None:
+    @staticmethod
+    def _extract_model_name(schema_ref: str | None) -> str | None:
         """
         Extract model name from schema reference.
 
@@ -300,7 +301,7 @@ class OpenAPISpec:
             return None
 
         # Use NamingUtils to ensure consistent class naming
-        model_name = NamingUtils.to_class_name(schema_ref.split("/")[-1])
+        model_name = NamingUtils.to_camel_case(schema_ref.split("/")[-1])
         return model_name
 
     def _get_request_body(
@@ -319,7 +320,7 @@ class OpenAPISpec:
         operation_id = ""
         if isinstance(request_body, dict) and "operation_id" in request_body:
             operation_id = request_body.pop("operation_id")
-            
+
         # Handle Swagger 2.0 format (list of parameters)
         if isinstance(request_body, list):
             for parameter in request_body:
@@ -330,11 +331,13 @@ class OpenAPISpec:
                         if model_name:
                             self.request_models.add(model_name)
                             return model_name, "application/json"
-                    
+
                     # Handle inline schema in Swagger 2.0
                     schema = parameter.get("schema", {})
                     if schema.get("type") == "object" and schema.get("properties"):
-                        model_name = self._generate_inline_model_name(operation_id, parameter.get("name", ""))
+                        model_name = self._generate_inline_model_name(
+                            operation_id, parameter.get("name", "")
+                        )
                         self._create_inline_model(schema, model_name)
                         self.request_models.add(model_name)
                         return model_name, "application/json"
@@ -346,7 +349,7 @@ class OpenAPISpec:
                     .get(content_type, {})
                     .get("schema", {})
                 )
-                
+
                 # Проверяем наличие $ref
                 schema_ref = schema.get("$ref")
                 if schema_ref:
@@ -354,7 +357,7 @@ class OpenAPISpec:
                     if model_name:
                         self.request_models.add(model_name)
                         return model_name, content_type
-                
+
                 # Обработка встроенных схем (inline schemas)
                 if schema.get("type") == "object" and schema.get("properties"):
                     model_name = self._generate_inline_model_name(operation_id)
@@ -364,61 +367,32 @@ class OpenAPISpec:
 
         return None, None
 
-    def _generate_inline_model_name(self, operation_id: str, param_name: str = "") -> str:
-        """
-        Generate a model name for an inline schema.
-        
-        Args:
-            operation_id: Operation ID from the API endpoint
-            param_name: Parameter name (if available)
-            
-        Returns:
-            Generated model name
-        """
+    @staticmethod
+    def _generate_inline_model_name(operation_id: str, param_name: str = "") -> str:
         if operation_id:
-            return f"{NamingUtils.to_pascal_case(operation_id)}Request"
+            return f"{NamingUtils.to_camel_case(operation_id)}Request"
         elif param_name:
-            return f"{NamingUtils.to_pascal_case(param_name)}Model"
+            return f"{NamingUtils.to_camel_case(param_name)}Model"
         else:
             return "RequestBodyModel"
-            
+
     def _create_inline_model(self, schema: dict[str, Any], model_name: str) -> None:
-        """
-        Create a model definition from an inline schema.
-        
-        Args:
-            schema: Schema object containing properties
-            model_name: Name for the generated model
-        """
-        # Store the schema in the components/schemas section for the model generator to find
         if "components" not in self.openapi_spec:
             self.openapi_spec["components"] = {}
-        
+
         if "schemas" not in self.openapi_spec["components"]:
             self.openapi_spec["components"]["schemas"] = {}
-            
-        # Add the schema to the components section
+
         self.openapi_spec["components"]["schemas"][model_name] = schema
-        
-        # Log the creation of the inline model
+
         LOGGER.info(f"Created inline model: {model_name}")
 
     def _get_response_body(self, response_body: dict[str, Any]) -> dict[str, str]:
-        """
-        Extract response models from OpenAPI spec.
-
-        Args:
-            response_body: Response specification
-
-        Returns:
-            Dictionary mapping status codes to model names
-        """
         responses: dict[str, str] = {}
 
         if not response_body:
             return responses
-            
-        # Extract operation_id and remove it from response_body to avoid iteration issues
+
         operation_id = ""
         if "operation_id" in response_body:
             operation_id = response_body.pop("operation_id")
@@ -432,8 +406,7 @@ class OpenAPISpec:
                         .get(content_type, {})
                         .get("schema", {})
                     )
-                    
-                    # Handle schema reference
+
                     schema_ref = schema.get("$ref")
                     if schema_ref:
                         model_name = self._extract_model_name(schema_ref)
@@ -441,11 +414,11 @@ class OpenAPISpec:
                             responses[status_code] = model_name
                             self.response_models.add(model_name)
                             continue
-                    
-                    # Handle inline schema
+
                     if schema.get("type") == "object" and schema.get("properties"):
-                        # Generate model name based on status code
-                        model_name = self._generate_inline_response_model_name(operation_id, status_code)
+                        model_name = self._generate_inline_response_model_name(
+                            operation_id, status_code
+                        )
                         self._create_inline_model(schema, model_name)
                         responses[status_code] = model_name
                         self.response_models.add(model_name)
@@ -454,8 +427,7 @@ class OpenAPISpec:
         elif self.openapi_version.startswith("2."):
             for status_code, response in response_body.items():
                 schema = response.get("schema", {})
-                
-                # Handle schema reference
+
                 schema_ref = schema.get("$ref") or schema.get("result")
                 if schema_ref:
                     model_name = self._extract_model_name(schema_ref)
@@ -463,27 +435,21 @@ class OpenAPISpec:
                         responses[status_code] = model_name
                         self.response_models.add(model_name)
                         continue
-                
-                # Handle inline schema
+
                 if schema.get("type") == "object" and schema.get("properties"):
-                    model_name = self._generate_inline_response_model_name(operation_id, status_code)
+                    model_name = self._generate_inline_response_model_name(
+                        operation_id, status_code
+                    )
                     self._create_inline_model(schema, model_name)
                     responses[status_code] = model_name
                     self.response_models.add(model_name)
 
         return responses
-        
-    def _generate_inline_response_model_name(self, operation_id: str, status_code: str) -> str:
-        """
-        Generate a model name for an inline response schema.
-        
-        Args:
-            operation_id: Operation ID from the API endpoint
-            status_code: HTTP status code
-            
-        Returns:
-            Generated model name
-        """
+
+    @staticmethod
+    def _generate_inline_response_model_name(
+        operation_id: str, status_code: str
+    ) -> str:
         status_name = {
             "200": "Success",
             "201": "Created",
@@ -493,24 +459,15 @@ class OpenAPISpec:
             "401": "Unauthorized",
             "403": "Forbidden",
             "404": "NotFound",
-            "500": "ServerError"
+            "500": "ServerError",
         }.get(status_code, f"Status{status_code}")
-        
+
         if operation_id:
-            return f"{NamingUtils.to_pascal_case(operation_id)}{status_name}Response"
+            return f"{NamingUtils.to_camel_case(operation_id)}{status_name}Response"
         else:
             return f"{status_name}Response"
 
     def _get_parameter_type(self, parameter: dict[str, Any]) -> str:
-        """
-        Get parameter type from OpenAPI spec.
-
-        Args:
-            parameter: Parameter specification
-
-        Returns:
-            Python type for the parameter
-        """
         schema = parameter.get("schema", {})
         param_type = schema.get("type")
 
@@ -541,11 +498,9 @@ class OpenAPISpec:
 
             return "Any"
 
-        # Handle basic types
         if param_type in TYPE_MAP:
             return TYPE_MAP[param_type]
 
-        # Handle arrays
         if param_type == "array":
             items = schema.get("items", {})
             item_type = items.get("type")
@@ -559,26 +514,15 @@ class OpenAPISpec:
         return "Any"
 
     def _process_parameter(self, parameter: dict[str, Any]) -> ParameterDict:
-        """
-        Process a parameter from OpenAPI spec.
-
-        Args:
-            parameter: Parameter specification
-
-        Returns:
-            Processed parameter dictionary
-        """
         param_dict: ParameterDict = {
-            "name": NamingUtils.to_param_name(parameter.get("name", "")),
+            "name": parameter.get("name", ""),
             "type": self._get_parameter_type(parameter),
             "required": parameter.get("required", False),
         }
 
-        # Add description if available
         if "description" in parameter:
             param_dict["description"] = parameter["description"]
 
-        # Add default value if available
         if "default" in parameter.get("schema", {}):
             param_dict["default"] = parameter["schema"]["default"]
 
@@ -602,49 +546,26 @@ class OpenAPISpec:
     def _get_params_with_types(
         self, parameters: list[dict[str, Any]], param_type: ParamType
     ) -> list[ParameterDict]:
-        """
-        Process parameters and extract type information.
-
-        Args:
-            parameters: List of parameters
-            param_type: Parameter type to extract
-
-        Returns:
-            List of processed parameters with type information
-        """
         if not parameters:
             return []
 
         params: list[ParameterDict] = []
 
         for parameter in parameters:
-            # Skip parameters that don't match the requested type
             if parameter.get("in") != param_type:
                 continue
 
-            # Skip excluded parameters
             parameter_name = parameter.get("name")
             if parameter_name in self.EXCLUDED_PARAMS:
                 continue
 
-            # Process parameter
             param_dict = self._process_parameter(parameter)
             params.append(param_dict)
 
         return params
 
-    def _extract_form_data_parameters(
-        self, schema: dict[str, Any]
-    ) -> list[dict[str, Any]]:
-        """
-        Extract form data parameters from schema.
-
-        Args:
-            schema: Schema object containing properties
-
-        Returns:
-            List of form data parameters
-        """
+    @staticmethod
+    def _extract_form_data_parameters(schema: dict[str, Any]) -> list[dict[str, Any]]:
         form_params = []
         properties = schema.get("properties", {})
         required = schema.get("required", [])
@@ -653,7 +574,7 @@ class OpenAPISpec:
             param_type = prop.get("type", "string")
             description = prop.get("description", "")
             format_type = prop.get("format", "")
-            
+
             # Определяем тип параметра на основе type и format
             if param_type == "string" and format_type == "binary":
                 python_type = "bytes"
@@ -675,25 +596,20 @@ class OpenAPISpec:
                     python_type = "list"
             else:
                 python_type = "str"
-            
-            form_params.append({
-                "name": name,
-                "type": python_type,
-                "description": description,
-                "required": name in required,
-                "format": format_type
-            })
-            
+
+            form_params.append(
+                {
+                    "name": name,
+                    "type": python_type,
+                    "description": description,
+                    "required": name in required,
+                    "format": format_type,
+                }
+            )
+
         return form_params
 
     def parse_openapi_spec(self) -> list[Handler]:
-        """
-        Parse OpenAPI specification and extract API endpoints.
-
-        Returns:
-            List of parsed handlers
-        """
-        # Extract metadata
         info = self.openapi_spec.get("info", {})
         self.version = info.get("version", "1.0.0")
         self.description = info.get("description", "")
@@ -701,7 +617,6 @@ class OpenAPISpec:
             "openapi", ""
         ) or self.openapi_spec.get("swagger", "")
 
-        # Warn about unsupported versions
         if self.openapi_version.startswith("2."):
             LOGGER.warning(
                 "OpenAPI/Swagger version 2.0 is not fully supported. "
@@ -709,7 +624,6 @@ class OpenAPISpec:
                 "and set the local spec path in 'swagger' option in nuke.toml!"
             )
 
-        # Process all paths and methods
         paths = self.openapi_spec.get("paths", {})
         for path, methods in paths.items():
             for method, details in methods.items():
@@ -718,24 +632,16 @@ class OpenAPISpec:
         return self.handlers
 
     def _process_method(self, path: str, method: str, details: dict[str, Any]) -> None:
-        """
-        Process API method details and create handler.
-
-        Args:
-            path: API path
-            method: HTTP method
-            details: Method details
-        """
-        # Extract tags and add to all_tags
-        tags = [NamingUtils.to_class_name(NamingUtils.to_snake_case(tag)) for tag in details.get("tags", [])]
+        tags = [
+            NamingUtils.to_camel_case(NamingUtils.to_snake_case(tag))
+            for tag in details.get("tags", [])
+        ]
         self.all_tags.update(tags)
 
-        # Extract basic metadata
         summary = details.get("summary", "")
         operation_id = details.get("operationId", "")
         parameters = details.get("parameters", [])
 
-        # Process parameters by type
         query_parameters = self._get_parameters(parameters, ParamType.QUERY)
         path_parameters = self._get_parameters(parameters, ParamType.PATH)
         headers = self._get_parameters(parameters, ParamType.HEADER)
@@ -743,28 +649,32 @@ class OpenAPISpec:
         if not path_parameters:
             path_parameters = self._extract_path_params_from_url(path)
 
-        # Process request body and responses
         request_body_data = details.get("requestBody", details.get("parameters", {}))
+
         # Добавляем operation_id в request_body_data для использования в _get_request_body
         if isinstance(request_body_data, dict) and operation_id:
             request_body_data["operation_id"] = operation_id
-            
+
         request_body, content_type = self._get_request_body(request_body_data)
-        
+
         # Add operation_id to responses for inline model generation
         responses_data = details.get("responses", {})
         if operation_id:
             responses_data["operation_id"] = operation_id
-            
+
         responses = self._get_response_body(responses_data)
 
-        # Extract form data parameters
         form_data_parameters = None
-        if content_type == "multipart/form-data" and isinstance(request_body_data, dict):
-            schema = request_body_data.get("content", {}).get("multipart/form-data", {}).get("schema", {})
+        if content_type == "multipart/form-data" and isinstance(
+            request_body_data, dict
+        ):
+            schema = (
+                request_body_data.get("content", {})
+                .get("multipart/form-data", {})
+                .get("schema", {})
+            )
             form_data_parameters = self._extract_form_data_parameters(schema)
 
-        # Create and store handler
         handler = Handler(
             path=self._normalize_swagger_path(path),
             method=method,
@@ -800,82 +710,53 @@ class OpenAPISpec:
         return params
 
     def models_by_tag(self, tag: str) -> set[str]:
-        """
-        Get all models used by handlers with specified tag.
-
-        Args:
-            tag: API tag
-
-        Returns:
-            Set of model names
-        """
         models = set()
 
         for handler in self.handlers:
             if tag not in handler.tags:
                 continue
 
-            # Extract models from path parameters
             if handler.path_parameters:
                 for param in handler.path_parameters:
                     param_type = param["type"]
                     if param_type not in TYPE_MAP.values():
                         models.add(param_type)
 
-            # Extract models from query parameters
             if handler.query_parameters:
                 for param in handler.query_parameters:
                     param_type = param["type"]
                     if param_type not in TYPE_MAP.values():
                         models.add(param_type)
 
-            # Extract models from headers
             if handler.headers:
                 for param in handler.headers:
                     param_type = param["type"]
                     if param_type not in TYPE_MAP.values():
                         models.add(param_type)
 
-            # Add request body model
             if handler.request_body:
                 models.add(handler.request_body)
 
-            # Add response models
             if handler.responses:
                 models.update(handler.responses.values())
 
         return models
 
     def handlers_by_tag(self, tag: str) -> list[Handler]:
-        """Get handlers filtered by tag."""
         return [h for h in self.handlers if tag in h.tags]
 
     def handlers_by_method(self, method: str) -> list[Handler]:
-        """Get handlers filtered by HTTP method."""
         return [h for h in self.handlers if h.method == method]
 
     def handler_by_path(self, path: str) -> list[Handler]:
-        """Get handlers filtered by path."""
         return [h for h in self.handlers if h.path == path]
 
     @staticmethod
     def _normalize_swagger_path(path: str) -> str:
-        """
-        Normalize path parameters in swagger path.
-
-        Args:
-            path: Original path with parameters
-
-        Returns:
-            Normalized path with snake_case parameters
-        """
-
         def replace_placeholder(match: re.Match) -> str:
             placeholder = match.group(0)[1:-1]
             return (
-                "{" + NamingUtils.to_param_name(placeholder) + "}"
-                if placeholder
-                else ""
+                f"{{{NamingUtils.to_param_name(placeholder)}}}" if placeholder else ""
             )
 
         return re.sub(r"\{[^}]*\}", replace_placeholder, path)

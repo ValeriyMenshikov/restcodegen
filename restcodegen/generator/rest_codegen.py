@@ -33,7 +33,6 @@ class RESTClientGenerator(BaseTemplateGenerator):
         self.async_mode = async_mode
 
     def generate(self) -> None:
-        """Generate all components of the REST client."""
         LOGGER.info(f"Generating REST client for service: {self.openapi_spec.service_name}")
         self._gen_clients()
         self._gen_init_apis()
@@ -41,7 +40,6 @@ class RESTClientGenerator(BaseTemplateGenerator):
         LOGGER.info(f"REST client generation completed for: {self.openapi_spec.service_name}")
 
     def _gen_init_apis(self) -> None:
-        """Generate __init__.py file for the APIs package."""
         LOGGER.info("Generating __init__.py for APIs")
         service_name_snake = NamingUtils.to_snake_case(self.openapi_spec.service_name)
         rendered_code = self.env.get_template("apis_init.jinja2").render(
@@ -54,14 +52,12 @@ class RESTClientGenerator(BaseTemplateGenerator):
         file_path = self.BASE_PATH / file_name
         create_and_write_file(file_path=file_path, text=rendered_code)
         
-        # Create parent __init__.py
         create_and_write_file(
             file_path=file_path.parent.parent / "__init__.py", 
             text="# coding: utf-8"
         )
 
     def _gen_clients(self) -> None:
-        """Generate client API files for each API tag."""
         service_name_snake = NamingUtils.to_snake_case(self.openapi_spec.service_name)
         
         for tag in self.openapi_spec.apis:
@@ -69,12 +65,6 @@ class RESTClientGenerator(BaseTemplateGenerator):
             self._gen_client_for_tag(tag, service_name_snake)
             
     def _gen_client_for_tag(self, tag: str, service_name_snake: str) -> None:
-        """Generate client API file for a specific tag.
-        
-        Args:
-            tag: API tag to generate client for
-            service_name_snake: Snake-cased service name
-        """
         handlers = self.openapi_spec.handlers_by_tag(tag)
         models = self.openapi_spec.models_by_tag(tag)
         
@@ -82,52 +72,38 @@ class RESTClientGenerator(BaseTemplateGenerator):
             async_mode=self.async_mode,
             models=models,
             data_list=handlers,
-            api_name=NamingUtils.to_pascal_case(NamingUtils.to_snake_case(tag)),
+            api_name=NamingUtils.to_camel_case(tag),
             service_name=self.openapi_spec.service_name,
             version=self.version,
         )
         
-        # Create API file
         file_name = f"{NamingUtils.to_snake_case(tag)}_api.py"
         file_path = self.BASE_PATH / service_name_snake / "apis" / file_name
         create_and_write_file(file_path=file_path, text=rendered_code)
         
-        # Create __init__.py if needed
         init_path = file_path.parent / "__init__.py"
         if not init_path.exists():
             create_and_write_file(file_path=init_path, text="# coding: utf-8")
 
     def _gen_models(self) -> None:
-        """Generate model files based on OpenAPI schemas."""
         LOGGER.info(f"Generating models for service: {self.openapi_spec.service_name}")
         service_name_snake = NamingUtils.to_snake_case(self.openapi_spec.service_name)
         
-        # Create model directory and files
         models_dir = self.BASE_PATH / service_name_snake / "models"
         file_path = models_dir / "api_models.py"
         
-        # Ensure directory exists
         models_dir.mkdir(parents=True, exist_ok=True)
         
-        # Create empty file for models
         create_and_write_file(file_path=file_path)
         
-        # Create __init__.py if needed
         init_path = models_dir / "__init__.py"
         if not init_path.exists():
             create_and_write_file(file_path=init_path, text="# coding: utf-8")
         
-        # Generate models using datamodel-code-generator
         header_path_template = self.templates_dir / "header.jinja2"
         self._generate_models_with_datamodel_generator(file_path, header_path_template)
     
     def _generate_models_with_datamodel_generator(self, file_path: Path, header_path_template: Path) -> None:
-        """Generate models using datamodel-code-generator.
-        
-        Args:
-            file_path: Path to write models to
-            header_path_template: Template for file header
-        """
         generate(
             json.dumps(self.openapi_spec.openapi_spec),
             output=file_path,
