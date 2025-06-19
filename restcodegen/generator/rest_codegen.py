@@ -7,7 +7,7 @@ from typing import (
 
 from restcodegen.generator.base import BaseTemplateGenerator
 from restcodegen.generator.log import LOGGER
-from restcodegen.generator.parser import OpenAPISpec
+from restcodegen.generator.parser import Parser
 from restcodegen.generator.utils import (
     create_and_write_file,
 )
@@ -21,7 +21,7 @@ class RESTClientGenerator(BaseTemplateGenerator):
 
     def __init__(
         self,
-        openapi_spec: OpenAPISpec,
+        openapi_spec: Parser,
         templates_dir: Optional[Path] = None,
         async_mode: bool = False,
     ) -> None:

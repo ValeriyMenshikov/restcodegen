@@ -7,6 +7,7 @@ import httpx
 from pydantic import BaseModel, Field, HttpUrl
 
 from restcodegen.generator.log import LOGGER
+from restcodegen.generator.spec_loader import SpecLoader
 from restcodegen.generator.utils import (
     name_to_snake,
     snake_to_camel,
@@ -42,7 +43,20 @@ class Handler(BaseModel):
         return getattr(self, key, default)
 
 
-class OpenAPISpec:
+class OpenApiSpec(BaseModel):
+    service_name: str = Field(...)
+    version: str = Field(...)
+    title: str = Field(...)
+    description: str = Field(...)
+    openapi_version: str = Field(...)
+    handlers: list[Handler]
+    request_models: set[str] = set()
+    response_models: set[str] = set()
+    api_tags: set[str] = set()
+    all_tags: set[str] = set()
+
+
+class Parser:
     BASE_PATH = Path.cwd() / "clients" / "http"
 
     def __init__(
@@ -52,17 +66,9 @@ class OpenAPISpec:
         api_tags: Optional[list[str]] = None,
     ) -> None:
         self.spec_path = str(openapi_spec)
-        self.itc_service_name = service_name
-        self.cache_spec_dir = self.BASE_PATH / "schemas"
 
-        if not self.cache_spec_dir.exists():
-            self.cache_spec_dir.mkdir(parents=True, exist_ok=True)
-
-        self.cache_spec_path = (
-            self.cache_spec_dir / f"{name_to_snake(self.itc_service_name)}.json"
-        )
-
-        self.openapi_spec: dict = self._open()
+        self._service_name = service_name
+        self.openapi_spec: dict = SpecLoader(self.spec_path, self._service_name).open()
         self.version: str = ""
         self.description: str = ""
         self.openapi_version: str = ""
@@ -71,7 +77,7 @@ class OpenAPISpec:
         self.response_models: set[str] = set()
         self.api_tags: set[str] = set(api_tags) if api_tags else set()
         self.all_tags: set[str] = set()
-        self.parse_openapi_spec()
+        self.parse()
 
     @property
     def apis(self) -> set[str]:
@@ -92,89 +98,11 @@ class OpenAPISpec:
 
     @property
     def service_name(self) -> str:
-        return self.itc_service_name
+        return self._service_name
 
     @property
     def client_type(self) -> str:
         return "http"
-
-    @staticmethod
-    def _patch(swagger_scheme: dict) -> dict:
-        """
-        Patch swagger json file to avoid multi files gen.
-
-        :param swagger_scheme: Swagger json
-        """
-        json_content = json.dumps(swagger_scheme)
-        schemas = swagger_scheme.get("components", {}).get(
-            "schemas", {}
-        ) or swagger_scheme.get("definitions", {})
-        schemas_to_patch = [schema for schema in schemas if "." in schema]
-
-        for _, methods in swagger_scheme.get("paths", {}).items():
-            for _, method in methods.items():
-                for tag in method.get("tags", []):
-                    if "." in tag:
-                        schemas_to_patch.append(tag)
-
-        for schema in schemas_to_patch:
-            for text in [f'/{schema}"', f'"{schema}"']:
-                json_content = json_content.replace(text, text.replace(".", ""))
-
-        return json.loads(json_content)
-
-    def _get_spec_by_url(self) -> Union[dict, None]:
-        try:
-            response = httpx.get(self.spec_path, timeout=5)
-            response.raise_for_status()
-        except httpx.HTTPError:
-            spec = {}
-            LOGGER.warning(f"OpenAPI spec not available by url: {self.spec_path} ")
-            file_path = (
-                self.spec_path
-                if Path(self.spec_path).is_file()
-                else str(self.cache_spec_path)
-            )
-            if Path(file_path).is_file():
-                LOGGER.warning(f"Try open OpenAPI spec by path: {file_path}")
-                with open(file_path, "r") as f:
-                    spec = self._patch(json.loads(f.read()))
-            return spec
-        else:
-            spec = self._patch(response.json())
-            with open(self.cache_spec_path, "w") as f:
-                f.write(json.dumps(spec, indent=4, ensure_ascii=False))
-            return spec
-
-    def _get_spec_from_cache(self) -> dict:
-        try:
-            with open(self.cache_spec_path, "r") as f:
-                spec = self._patch(json.loads(f.read()))
-                self.spec_path = self.cache_spec_path  # type: ignore
-                LOGGER.warning(f"OpenAPI spec got from cash: {self.spec_path}")
-                return spec
-        except FileNotFoundError as e:
-            raise FileNotFoundError(
-                f"OpenAPI spec not available from url: {self.spec_path}, and not found in cash"
-            ) from e
-
-    def _get_spec_by_path(self) -> Union[dict, None]:
-        try:
-            with open(self.spec_path, "r") as f:
-                spec = json.loads(f.read())
-        except FileNotFoundError:
-            LOGGER.warning(f"OpenAPI spec not found from local path: {self.spec_path}")
-            return None
-        else:
-            return spec
-
-    def _open(self) -> dict:
-        spec = self._get_spec_by_url()
-        if not spec:
-            spec = self._get_spec_by_path()
-        if not spec:
-            spec = self._get_spec_from_cache()
-        return spec
 
     def _get_request_body(self, request_body: Union[dict, list]) -> Union[str, None]:
         if isinstance(request_body, list):
@@ -325,7 +253,7 @@ class OpenAPISpec:
 
         return params
 
-    def parse_openapi_spec(self) -> list[Handler]:
+    def parse(self) -> list[Handler]:
         info = self.openapi_spec.get("info", {})
         self.version = info.get("version", "1.0.0")
         self.description = info.get("description", "")
