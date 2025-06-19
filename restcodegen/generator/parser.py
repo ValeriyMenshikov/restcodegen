@@ -7,6 +7,10 @@ import httpx
 from pydantic import BaseModel, Field, HttpUrl
 
 from restcodegen.generator.log import LOGGER
+from restcodegen.generator.parameters import (
+    ParameterType,
+    BaseParameter,
+)
 from restcodegen.generator.spec_loader import SpecLoader
 from restcodegen.generator.utils import (
     name_to_snake,
@@ -33,9 +37,9 @@ class Handler(BaseModel):
     tags: list = Field(...)
     summary: Optional[str] = Field(None)
     operation_id: Optional[str] = Field(None)
-    path_parameters: Optional[list] = Field(None)
-    query_parameters: Optional[list] = Field(None)
-    headers: Optional[list] = Field(None)
+    path_parameters: Optional[list[BaseParameter]] = Field(None)
+    query_parameters: Optional[list[BaseParameter]] = Field(None)
+    headers: Optional[list[BaseParameter]] = Field(None)
     request_body: Optional[str] = Field(None)
     responses: Optional[dict] = Field(None)
 
@@ -162,24 +166,30 @@ class Parser:
         return responses
 
     def _get_headers(self, parameters: list) -> list:
-        params = self._get_params_with_types(parameters, param_type="header")
+        params = self._get_params_with_types(
+            parameters, param_type=ParameterType.HEADER
+        )
         return params
 
     def _get_request_parameters(self, parameters: list) -> list:
-        params = self._get_params_with_types(parameters, param_type="header")
+        params = self._get_params_with_types(
+            parameters, param_type=ParameterType.HEADER
+        )
         return params
 
     def _get_path_parameters(self, parameters: list) -> list:
-        params = self._get_params_with_types(parameters, param_type="path")
+        params = self._get_params_with_types(parameters, param_type=ParameterType.PATH)
         return params
 
     def _get_query_parameters(self, parameters: list) -> list:
-        params = self._get_params_with_types(parameters, param_type="query")
+        params = self._get_params_with_types(parameters, param_type=ParameterType.QUERY)
         return params
 
     @staticmethod
-    def _get_params_with_types(parameters: list, param_type: str) -> list:
-        params: list[dict[str, str]] = []
+    def _get_params_with_types(
+        parameters: list, param_type: str
+    ) -> list[BaseParameter]:
+        params: list[BaseParameter] = []
         exclude_params = ["x-o3-app-name"]
         if not parameters:
             return params
@@ -202,19 +212,18 @@ class Parser:
                 if enum:
                     parameter_type = enum.split("/")[-1]
 
-                parameter_with_desc = {
-                    "name": parameter_name,
-                    "type": parameter_type
+                parameter_with_desc = BaseParameter(
+                    name=parameter_name,
+                    type_=parameter_type
                     if enum
                     else TYPE_MAP[str(parameter_type).lower()],
-                    "description": parameter_description,
-                    "required": parameter_is_required,
-                }
-
-                if not parameter_is_required:
-                    parameter_with_desc["default"] = DEFAULT_HEADER_VALUE_MAP.get(
+                    description=parameter_description,
+                    required=parameter_is_required,
+                    default=DEFAULT_HEADER_VALUE_MAP.get(
                         TYPE_MAP.get(parameter_type, "")
-                    )
+                    ),
+                )
+
                 params.append(parameter_with_desc)
 
         return params
@@ -313,17 +322,17 @@ class Parser:
             if tag in handler.tags:
                 if handler.path_parameters is not None:
                     for param in handler.path_parameters:
-                        param = param["type"]
+                        param = param.type
                         if param not in TYPE_MAP.values():
                             models.add(param)
                 if handler.query_parameters is not None:
                     for query_param in handler.query_parameters:
-                        query_param = query_param["type"]
+                        query_param = query_param.type
                         if query_param not in TYPE_MAP.values():
                             models.add(query_param)
                 if handler.headers is not None:
                     for header_param in handler.headers:
-                        header_param = header_param["type"]
+                        header_param = header_param.type
                         if header_param not in TYPE_MAP.values():
                             models.add(header_param)
                 if handler.request_body is not None:
