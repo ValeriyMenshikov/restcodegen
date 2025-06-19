@@ -77,8 +77,6 @@ class Parser:
         self.description: str = ""
         self.openapi_version: str = ""
         self.handlers: list[Handler] = []
-        self.request_models: set[str] = set()
-        self.response_models: set[str] = set()
         self.api_tags: set[str] = set(api_tags) if api_tags else set()
         self.all_tags: set[str] = set()
         self.parse()
@@ -116,7 +114,6 @@ class Parser:
                     if schema:
                         model_path = snake_to_camel(schema.split("/")[-1])
                         model_name = model_path[0].upper() + model_path[1:]
-                        self.request_models.add(model_name)
                         return model_name
         else:
             for content_type in request_body.get("content", {}).keys():
@@ -128,7 +125,6 @@ class Parser:
                 )
                 if schema:
                     model_name = snake_to_camel(schema.split("/")[-1])
-                    self.request_models.add(model_name)
                     return model_name
         return None
 
@@ -151,7 +147,6 @@ class Parser:
                         if model_name:
                             model_name = snake_to_camel(model_name)
                             responses[status_code] = model_name
-                            self.response_models.add(model_name)
             elif self.openapi_version.startswith("2."):
                 for status_code, response in response_body.items():
                     ref_schema = response.get("schema", {}).get("$ref")
@@ -162,7 +157,6 @@ class Parser:
                         responses[status_code] = model
                         model_name = model[0].upper() + model[1:]
                         responses[status_code] = model_name
-                        self.response_models.add(model_name)
         return responses
 
     def _get_headers(self, parameters: list) -> list:
@@ -315,6 +309,22 @@ class Parser:
             responses=responses,
         )
         self.handlers.append(path_obj)
+
+    @staticmethod
+    def request_models(self):
+        models = set()
+        for handler in self.handlers:
+            if handler.request_body is not None:
+                models.add(handler.request_body)
+        return models
+
+    @staticmethod
+    def response_models(self):
+        models = set()
+        for handler in self.handlers:
+            if handler.responses is not None:
+                models.update(handler.responses.values())
+        return models
 
     def models_by_tag(self, tag: str) -> set[str]:
         models = set()
