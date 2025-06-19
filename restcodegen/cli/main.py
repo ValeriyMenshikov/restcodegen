@@ -46,7 +46,7 @@ def generate_command(
     parser = Parser(
         openapi_spec=url,
         service_name=service_name,
-        api_tags=api_tags.split(",") if api_tags else None,
+        selected_tags=api_tags.split(",") if api_tags else None,
     )
     gen = RESTClientGenerator(openapi_spec=parser, async_mode=async_mode)
     gen.generate()

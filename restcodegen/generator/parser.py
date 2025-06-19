@@ -67,33 +67,33 @@ class Parser:
         self,
         openapi_spec: Union[str, HttpUrl],
         service_name: str,
-        api_tags: Optional[list[str]] = None,
+        selected_tags: Optional[list[str]] = None,
     ) -> None:
-        self.spec_path = str(openapi_spec)
+        self._spec_path = str(openapi_spec)
 
         self._service_name = service_name
-        self.openapi_spec: dict = SpecLoader(self.spec_path, self._service_name).open()
+        self.openapi_spec: dict = SpecLoader(self._spec_path, self._service_name).open()
         self.version: str = ""
         self.description: str = ""
         self.openapi_version: str = ""
         self.handlers: list[Handler] = []
-        self.api_tags: set[str] = set(api_tags) if api_tags else set()
+        self._selected_tags: set[str] = set(selected_tags) if selected_tags else set()
         self.all_tags: set[str] = set()
         self.parse()
 
     @property
     def apis(self) -> set[str]:
         result_tags = set()
-        for tag in self.api_tags:
+        for tag in self._selected_tags:
             if tag not in self.all_tags:
                 LOGGER.warning(f"Tag {tag} not found in openapi spec")
             else:
                 result_tags.add(tag)
 
-        if not result_tags and self.api_tags:
+        if not result_tags and self._selected_tags:
             LOGGER.warning("Tags not found in openapi spec, used default tags")
             return self.all_tags
-        elif not result_tags and not self.api_tags:
+        elif not result_tags and not self._selected_tags:
             return self.all_tags
 
         return result_tags
@@ -159,29 +159,23 @@ class Parser:
                         responses[status_code] = model_name
         return responses
 
-    def _get_headers(self, parameters: list) -> list:
+    def _get_headers(self, parameters: list[dict]) -> list[BaseParameter]:
         params = self._get_params_with_types(
             parameters, param_type=ParameterType.HEADER
         )
         return params
 
-    def _get_request_parameters(self, parameters: list) -> list:
-        params = self._get_params_with_types(
-            parameters, param_type=ParameterType.HEADER
-        )
-        return params
-
-    def _get_path_parameters(self, parameters: list) -> list:
+    def _get_path_parameters(self, parameters: list[dict]) -> list[BaseParameter]:
         params = self._get_params_with_types(parameters, param_type=ParameterType.PATH)
         return params
 
-    def _get_query_parameters(self, parameters: list) -> list:
+    def _get_query_parameters(self, parameters: list[dict]) -> list[BaseParameter]:
         params = self._get_params_with_types(parameters, param_type=ParameterType.QUERY)
         return params
 
     @staticmethod
     def _get_params_with_types(
-        parameters: list, param_type: str
+        parameters: list[dict], param_type: ParameterType
     ) -> list[BaseParameter]:
         params: list[BaseParameter] = []
         exclude_params = ["x-o3-app-name"]
@@ -239,19 +233,19 @@ class Parser:
         return normalized_path
 
     @staticmethod
-    def _extract_path_params_from_url(path: str) -> list:
+    def _extract_path_params_from_url(path: str) -> list[BaseParameter]:
         params = []
         path_params = re.findall(r"\{([^}]+)\}", path)
 
         for param in path_params:
             param_name = name_to_snake(param)
             params.append(
-                {
-                    "name": param_name,
-                    "type": "str",
-                    "description": f"Path parameter: {param_name}",
-                    "required": True,
-                }
+                BaseParameter(
+                    name=param_name,
+                    type_="str",
+                    description=f"Path parameter: {param_name}",
+                    required=True,
+                )
             )
 
         return params
@@ -311,7 +305,7 @@ class Parser:
         self.handlers.append(path_obj)
 
     @staticmethod
-    def request_models(self):
+    def request_models(self) -> set[str]:
         models = set()
         for handler in self.handlers:
             if handler.request_body is not None:
@@ -319,7 +313,7 @@ class Parser:
         return models
 
     @staticmethod
-    def response_models(self):
+    def response_models(self) -> set[str]:
         models = set()
         for handler in self.handlers:
             if handler.responses is not None:

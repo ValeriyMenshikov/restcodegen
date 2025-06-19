@@ -16,7 +16,7 @@ class BaseParameter(BaseModel):
     description: str
     type: str = Field(..., alias="type_")
     required: bool
-    default: Any
+    default: Any | None = None
 
     def get(self, key: str, default: Any = None) -> Any:
         return getattr(self, key, default)
