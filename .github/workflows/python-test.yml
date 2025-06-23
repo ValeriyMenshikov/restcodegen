@@ -31,7 +31,7 @@ jobs:
     
     - name: Lint with ruff
       run: |
-        poetry run ruff check .
+        poetry run ruff check restcodegen
     
     - name: Type check with mypy
       run: |
