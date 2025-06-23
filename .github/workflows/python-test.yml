@@ -19,6 +19,9 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Полная история для сравнения веток
+    
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v4
       with:
@@ -45,10 +48,11 @@ jobs:
       run: |
         poetry run pytest
     
-    - name: Comment coverage on PR
+    - name: Coverage report
       if: github.event_name == 'pull_request'
-      uses: MishaKav/pytest-coverage-comment@main
+      uses: ewjoachim/python-coverage-comment-action@v2
       with:
-        pytest-coverage-path: ./coverage.xml
-        junitxml-path: ./junit.xml
-        github-token: ${{ secrets.GITHUB_TOKEN }}
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        COVERAGE_FILE: coverage.xml
+        MINIMUM_GREEN: 80
+        MINIMUM_ORANGE: 50
