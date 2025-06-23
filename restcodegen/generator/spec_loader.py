@@ -1,6 +1,7 @@
 import json
 from pathlib import Path
 from typing import Union
+from pydantic import HttpUrl
 import httpx
 
 from restcodegen.generator.log import LOGGER
@@ -11,7 +12,7 @@ from restcodegen.generator.utils import name_to_snake
 class SpecLoader:
     BASE_PATH = Path.cwd() / "clients" / "http"
 
-    def __init__(self, spec, service_name):
+    def __init__(self, spec: str, service_name: str) -> None:
         self.spec_path = spec
         self.service_name = service_name
         self.cache_spec_dir = self.BASE_PATH / "schemas"

@@ -1,9 +1,7 @@
-import json
 import re
 from pathlib import Path
 from typing import Any, Optional, Union
 
-import httpx
 from pydantic import BaseModel, Field, HttpUrl
 
 from restcodegen.generator.log import LOGGER
@@ -178,7 +176,6 @@ class Parser:
         parameters: list[dict], param_type: ParameterType
     ) -> list[BaseParameter]:
         params: list[BaseParameter] = []
-        exclude_params = ["x-o3-app-name"]
         if not parameters:
             return params
         for parameter in parameters:
@@ -192,13 +189,14 @@ class Parser:
                 parameter_description = parameter.get("description", "")
                 parameter_is_required = parameter.get("required", False)
 
-                if parameter_name in exclude_params:
-                    continue
-
                 if any_of:
                     parameter_type = "anyof"
                 if enum:
                     parameter_type = enum.split("/")[-1]
+
+                # Пропускаем параметр, если имя не определено
+                if parameter_name is None:
+                    continue
 
                 parameter_with_desc = BaseParameter(
                     name=parameter_name,
@@ -304,41 +302,39 @@ class Parser:
         )
         self.handlers.append(path_obj)
 
-    @staticmethod
     def request_models(self) -> set[str]:
-        models = set()
+        models: set[str] = set()
         for handler in self.handlers:
             if handler.request_body is not None:
                 models.add(handler.request_body)
         return models
 
-    @staticmethod
     def response_models(self) -> set[str]:
-        models = set()
+        models: set[str] = set()
         for handler in self.handlers:
             if handler.responses is not None:
                 models.update(handler.responses.values())
         return models
 
     def models_by_tag(self, tag: str) -> set[str]:
-        models = set()
+        models: set[str] = set()
         for handler in self.handlers:
             if tag in handler.tags:
                 if handler.path_parameters is not None:
                     for param in handler.path_parameters:
-                        param = param.type
-                        if param not in TYPE_MAP.values():
-                            models.add(param)
+                        param_type = param.type
+                        if param_type not in TYPE_MAP.values():
+                            models.add(param_type)
                 if handler.query_parameters is not None:
                     for query_param in handler.query_parameters:
-                        query_param = query_param.type
-                        if query_param not in TYPE_MAP.values():
-                            models.add(query_param)
+                        query_param_type = query_param.type
+                        if query_param_type not in TYPE_MAP.values():
+                            models.add(query_param_type)
                 if handler.headers is not None:
                     for header_param in handler.headers:
-                        header_param = header_param.type
-                        if header_param not in TYPE_MAP.values():
-                            models.add(header_param)
+                        header_param_type = header_param.type
+                        if header_param_type not in TYPE_MAP.values():
+                            models.add(header_param_type)
                 if handler.request_body is not None:
                     models.add(handler.request_body)
                 if handler.responses is not None:
