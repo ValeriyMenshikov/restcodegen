@@ -1,0 +1,717 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Test API",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/users/{id}": {
+      "get": {
+        "tags": [
+            "Users"
+        ],
+        "summary": "Get user by ID",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "User ID"
+          },
+          {
+            "name": "verbose",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            },
+            "description": "Verbose output"
+          },
+          {
+            "name": "X-Request-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Optional request ID"
+          },
+          {
+            "name": "OrderByType",
+            "in": "query",
+            "schema": {
+                "$ref": "#/components/schemas/DoctisBackPatientApiDoctorConsultationReviewOrderByType"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "User found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "User not found"
+          }
+        }
+      }
+    },
+    "/users": {
+      "post": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "Create a new user",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/User"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "User created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/users/bad_request_model": {
+      "post": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "Create a new user",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DoctisInfrastructureJSendJSendJsonResult`1[[SystemCollectionsGenericIEnumerable`1[[DoctisBackPatientApiReusableConsultationReviewResponse, DoctisBackPatient, Version=1000, Culture=neutral, PublicKeyToken=null]], SystemPrivateCoreLib, Version=8000, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]]"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "User created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DoctisInfrastructureJSendJSendJsonResult`1[[SystemCollectionsGenericIEnumerable`1[[DoctisBackPatientApiReusableConsultationReviewResponse, DoctisBackPatient, Version=1000, Culture=neutral, PublicKeyToken=null]], SystemPrivateCoreLib, Version=8000, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]]"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v4/posts": {
+      "post": {
+        "tags": [
+          "posts"
+        ],
+        "summary": "Create a post",
+        "description": "Create a new post in a channel. To create the post as a comment on another post, provide `root_id`.\n##### Permissions\nMust have `create_post` permission for the channel the post is being created in.\n",
+        "operationId": "CreatePost",
+        "parameters": [
+          {
+            "name": "set_online",
+            "in": "query",
+            "description": "Whether to set the user status as online or not.",
+            "required": false,
+            "style": "form",
+            "explode": true,
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "Post object to create",
+          "content": {
+            "application/json": {
+              "schema": {
+                "required": [
+                  "channel_id",
+                  "message"
+                ],
+                "type": "object",
+                "properties": {
+                  "channel_id": {
+                    "type": "string",
+                    "description": "The channel ID to post in"
+                  },
+                  "message": {
+                    "type": "string",
+                    "description": "The message contents, can be formatted with Markdown"
+                  },
+                  "root_id": {
+                    "type": "string",
+                    "description": "The post ID to comment on"
+                  },
+                  "file_ids": {
+                    "type": "array",
+                    "description": "A list of file IDs to associate with the post. Note that posts are limited to 5 files maximum. Please use additional posts for more files.",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "props": {
+                    "type": "object",
+                    "description": "A general JSON property bag to attach to the post"
+                  },
+                  "metadata": {
+                    "type": "object",
+                    "properties": {
+                      "priority": {
+                        "type": "object",
+                        "properties": {
+                          "priority": {
+                            "type": "string",
+                            "description": "The priority label of the post, could empty, important, or urgent"
+                          },
+                          "requested_ack": {
+                            "type": "boolean",
+                            "description": "Set to true to request for acknowledgements"
+                          }
+                        },
+                        "description": "An object containing the post's priority properties"
+                      }
+                    },
+                    "description": "A JSON object to add post metadata, e.g the post's priority"
+                  }
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Post creation successful",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Post"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    }
+  },
+
+  "components": {
+    "schemas": {
+      "User": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "example": 1
+          },
+          "name": {
+            "type": "string",
+            "example": "Alice"
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "example": "alice@example.com"
+          }
+        },
+        "required": ["name", "email"]
+      },
+      "DoctisBackPatientApiDoctorConsultationReviewOrderByType": {
+          "enum": [
+              "Positive",
+              "Negative",
+              "New",
+              "Old"
+          ],
+          "type": "string"
+      },
+      "DoctisInfrastructureJSendJSendJsonResult`1[[SystemCollectionsGenericIEnumerable`1[[DoctisBackPatientApiReusableConsultationReviewResponse, DoctisBackPatient, Version=1000, Culture=neutral, PublicKeyToken=null]], SystemPrivateCoreLib, Version=8000, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]]": {
+          "type": "object",
+          "properties": {
+              "status": {
+                  "type": "string",
+                  "nullable": true,
+                  "readOnly": true
+              },
+              "data": {
+                  "type": "array",
+                  "items": {
+                      "$ref": "#/components/schemas/DoctisBackPatientApiReusableConsultationReviewResponse"
+                  },
+                  "nullable": true,
+                  "readOnly": true
+              }
+          },
+          "additionalProperties": false
+      },
+      "DoctisBackPatientApiReusableConsultationReviewResponse": {
+          "type": "object",
+          "properties": {
+              "id": {
+                  "type": "string",
+                  "format": "uuid"
+              },
+              "secondaryReactionOne": {
+                  "$ref": "#/components/schemas/DoctisBackPatientApiReusableReviewReactionType"
+              },
+              "secondaryReactionTwo": {
+                  "$ref": "#/components/schemas/DoctisBackPatientApiReusableReviewReactionType"
+              },
+              "reviewText": {
+                  "type": "string",
+                  "nullable": true
+              },
+              "createdAt": {
+                  "type": "string",
+                  "format": "date-time"
+              },
+              "diagnosis": {
+                  "type": "string",
+                  "nullable": true
+              }
+          },
+          "additionalProperties": false
+      },
+      "DoctisBackPatientApiReusableReviewReactionType": {
+          "enum": [
+              "Tactfull",
+              "Sensitive",
+              "ExplainsWell",
+              "Involved",
+              "Literate",
+              "DidNotLike"
+          ],
+          "type": "string"
+      },
+      "Post": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "create_at": {
+            "type": "integer",
+            "description": "The time in milliseconds a post was created",
+            "format": "int64"
+          },
+          "update_at": {
+            "type": "integer",
+            "description": "The time in milliseconds a post was last updated",
+            "format": "int64"
+          },
+          "delete_at": {
+            "type": "integer",
+            "description": "The time in milliseconds a post was deleted",
+            "format": "int64"
+          },
+          "edit_at": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "user_id": {
+            "type": "string"
+          },
+          "channel_id": {
+            "type": "string"
+          },
+          "root_id": {
+            "type": "string"
+          },
+          "original_id": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "props": {
+            "type": "object"
+          },
+          "hashtag": {
+            "type": "string"
+          },
+          "file_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "pending_post_id": {
+            "type": "string"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/PostMetadata"
+          }
+        }
+      },
+      "PostMetadata": {
+        "type": "object",
+        "properties": {
+          "embeds": {
+            "type": "array",
+            "description": "Information about content embedded in the post including OpenGraph previews, image link previews, and message attachments. This field will be null if the post does not contain embedded content.\n",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "description": "The type of content that is embedded in this point.",
+                  "enum": [
+                    "image",
+                    "message_attachment",
+                    "opengraph",
+                    "link"
+                  ]
+                },
+                "url": {
+                  "type": "string",
+                  "description": "The URL of the embedded content, if one exists."
+                },
+                "data": {
+                  "type": "object",
+                  "description": "Any additional information about the embedded content. Only used at this time to store OpenGraph metadata.\nThis field will be null for non-OpenGraph embeds.\n"
+                }
+              }
+            }
+          },
+          "emojis": {
+            "type": "array",
+            "description": "The custom emojis that appear in this point or have been used in reactions to this post. This field will be null if the post does not contain custom emojis.\n",
+            "items": {
+              "$ref": "#/components/schemas/Emoji"
+            }
+          },
+          "files": {
+            "type": "array",
+            "description": "The FileInfo objects for any files attached to the post. This field will be null if the post does not have any file attachments.\n",
+            "items": {
+              "$ref": "#/components/schemas/FileInfo"
+            }
+          },
+          "images": {
+            "type": "array",
+            "description": "An object mapping the URL of an external image to an object containing the dimensions of that image. This field will be null if the post or its embedded content does not reference any external images.\n",
+            "items": {
+              "type": "object",
+              "properties": {
+                "height": {
+                  "type": "integer"
+                },
+                "width": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "reactions": {
+            "type": "array",
+            "description": "Any reactions made to this point. This field will be null if no reactions have been made to this post.\n",
+            "items": {
+              "$ref": "#/components/schemas/Reaction"
+            }
+          },
+          "priority": {
+            "type": "object",
+            "properties": {
+              "priority": {
+                "type": "string",
+                "description": "The priority label of a post, could be either empty, important, or urgent."
+              },
+              "requested_ack": {
+                "type": "boolean",
+                "description": "Whether the post author has requested for acknowledgements or not."
+              }
+            },
+            "description": "Post priority set for this post. This field will be null if no priority metadata has been set.\n"
+          },
+          "acknowledgements": {
+            "type": "array",
+            "description": "Any acknowledgements made to this point.\n",
+            "items": {
+              "$ref": "#/components/schemas/PostAcknowledgement"
+            }
+          }
+        },
+        "description": "Additional information used to display a post."
+      },
+      "Emoji": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The ID of the emoji"
+          },
+          "creator_id": {
+            "type": "string",
+            "description": "The ID of the user that made the emoji"
+          },
+          "name": {
+            "type": "string",
+            "description": "The name of the emoji"
+          },
+          "create_at": {
+            "type": "integer",
+            "description": "The time in milliseconds the emoji was made",
+            "format": "int64"
+          },
+          "update_at": {
+            "type": "integer",
+            "description": "The time in milliseconds the emoji was last updated",
+            "format": "int64"
+          },
+          "delete_at": {
+            "type": "integer",
+            "description": "The time in milliseconds the emoji was deleted",
+            "format": "int64"
+          }
+        }
+      },
+      "FileInfo": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The unique identifier for this file"
+          },
+          "user_id": {
+            "type": "string",
+            "description": "The ID of the user that uploaded this file"
+          },
+          "post_id": {
+            "type": "string",
+            "description": "If this file is attached to a post, the ID of that post"
+          },
+          "create_at": {
+            "type": "integer",
+            "description": "The time in milliseconds a file was created",
+            "format": "int64"
+          },
+          "update_at": {
+            "type": "integer",
+            "description": "The time in milliseconds a file was last updated",
+            "format": "int64"
+          },
+          "delete_at": {
+            "type": "integer",
+            "description": "The time in milliseconds a file was deleted",
+            "format": "int64"
+          },
+          "name": {
+            "type": "string",
+            "description": "The name of the file"
+          },
+          "extension": {
+            "type": "string",
+            "description": "The extension at the end of the file name"
+          },
+          "size": {
+            "type": "integer",
+            "description": "The size of the file in bytes"
+          },
+          "mime_type": {
+            "type": "string",
+            "description": "The MIME type of the file"
+          },
+          "width": {
+            "type": "integer",
+            "description": "If this file is an image, the width of the file"
+          },
+          "height": {
+            "type": "integer",
+            "description": "If this file is an image, the height of the file"
+          },
+          "has_preview_image": {
+            "type": "boolean",
+            "description": "If this file is an image, whether or not it has a preview-sized version"
+          }
+        }
+      },
+      "Reaction": {
+        "type": "object",
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "description": "The ID of the user that made this reaction"
+          },
+          "post_id": {
+            "type": "string",
+            "description": "The ID of the post to which this reaction was made"
+          },
+          "emoji_name": {
+            "type": "string",
+            "description": "The name of the emoji that was used for this reaction"
+          },
+          "create_at": {
+            "type": "integer",
+            "description": "The time in milliseconds this reaction was made",
+            "format": "int64"
+          }
+        }
+      },
+      "PostAcknowledgement": {
+        "type": "object",
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "description": "The ID of the user that made this acknowledgement."
+          },
+          "post_id": {
+            "type": "string",
+            "description": "The ID of the post to which this acknowledgement was made."
+          },
+          "acknowledged_at": {
+            "type": "integer",
+            "description": "The time in milliseconds in which this acknowledgement was made.",
+            "format": "int64"
+          }
+        }
+      },
+      "AppError": {
+        "type": "object",
+        "properties": {
+          "status_code": {
+            "type": "integer"
+          },
+          "id": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "responses": {
+      "Forbidden": {
+        "description": "Do not have appropriate permissions",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/AppError"
+            }
+          }
+        }
+      },
+      "Unauthorized": {
+        "description": "No access token provided",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/AppError"
+            }
+          }
+        }
+      },
+      "BadRequest": {
+        "description": "Invalid or missing parameters in URL or request body",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/AppError"
+            }
+          }
+        }
+      },
+      "NotFound": {
+        "description": "Resource not found",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/AppError"
+            }
+          }
+        }
+      },
+      "TooLarge": {
+        "description": "Content too large",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/AppError"
+            }
+          }
+        }
+      },
+      "NotImplemented": {
+        "description": "Feature is disabled",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/AppError"
+            }
+          }
+        }
+      },
+      "TooManyRequests": {
+        "description": "Too many requests",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/AppError"
+            }
+          }
+        }
+      },
+      "InternalServerError": {
+        "description": "Something went wrong with the server",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/AppError"
+            }
+          }
+        }
+      },
+      "BadGateway": {
+        "description": "Bad gateway",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/AppError"
+            }
+          }
+        }
+      }
+    }
+  }
+}

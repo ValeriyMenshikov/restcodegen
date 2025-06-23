@@ -221,7 +221,7 @@ def test_replace_dots_in_schema_names(schema_with_dots: dict) -> None:
     assert "usersmanagement" in patched["paths"]["/users"]["get"]["tags"]
 
 
-def test_extract_nested_objects(schema_with_nested_objects: dict):
+def test_extract_nested_objects(schema_with_nested_objects: dict) -> None:
     """Test that nested objects are extracted to components/schemas."""
     patcher = SpecPatcher()
     patched = patcher.patch(schema_with_nested_objects)
@@ -262,7 +262,7 @@ def test_extract_combined_schemas(schema_with_combined_schemas: dict) -> None:
     assert oneof_schema[1]["$ref"] == "#/components/schemas/create_product_request_body_oneOf_1"
 
 
-def test_idempotent_patching(simple_swagger_schema: dict):
+def test_idempotent_patching(simple_swagger_schema: dict) -> None:
     """Test that patching an already patched schema doesn't change it further."""
     patcher = SpecPatcher()
     patched_once = patcher.patch(simple_swagger_schema)
