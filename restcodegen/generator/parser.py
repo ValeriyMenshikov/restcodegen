@@ -1,19 +1,19 @@
 import re
 from pathlib import Path
-from typing import Any, Optional, Union
+from typing import Any
 
 from pydantic import BaseModel, Field, HttpUrl
 
 from restcodegen.generator.log import LOGGER
 from restcodegen.generator.parameters import (
-    ParameterType,
     BaseParameter,
+    ParameterType,
 )
 from restcodegen.generator.spec_loader import SpecLoader
 from restcodegen.generator.utils import (
     name_to_snake,
-    snake_to_camel,
     rename_python_builtins,
+    snake_to_camel,
 )
 
 TYPE_MAP = {
@@ -33,13 +33,13 @@ class Handler(BaseModel):
     path: str = Field(...)
     method: str = Field(...)
     tags: list = Field(...)
-    summary: Optional[str] = Field(None)
-    operation_id: Optional[str] = Field(None)
-    path_parameters: Optional[list[BaseParameter]] = Field(None)
-    query_parameters: Optional[list[BaseParameter]] = Field(None)
-    headers: Optional[list[BaseParameter]] = Field(None)
-    request_body: Optional[str] = Field(None)
-    responses: Optional[dict] = Field(None)
+    summary: str | None = Field(None)
+    operation_id: str | None = Field(None)
+    path_parameters: list[BaseParameter] | None = Field(None)
+    query_parameters: list[BaseParameter] | None = Field(None)
+    headers: list[BaseParameter] | None = Field(None)
+    request_body: str | None = Field(None)
+    responses: dict | None = Field(None)
 
     def get(self, key: str, default: Any = None) -> Any:
         return getattr(self, key, default)
@@ -63,9 +63,9 @@ class Parser:
 
     def __init__(
         self,
-        openapi_spec: Union[str, HttpUrl],
+        openapi_spec: str | HttpUrl,
         service_name: str,
-        selected_tags: Optional[list[str]] = None,
+        selected_tags: list[str] | None = None,
     ) -> None:
         self._spec_path = str(openapi_spec)
 
@@ -104,7 +104,7 @@ class Parser:
     def client_type(self) -> str:
         return "http"
 
-    def _get_request_body(self, request_body: Union[dict, list]) -> Union[str, None]:
+    def _get_request_body(self, request_body: dict | list) -> str | None:
         if isinstance(request_body, list):
             for parameter in request_body:
                 if parameter.get("in") == "body":
@@ -130,7 +130,7 @@ class Parser:
         responses: dict = {}
         if response_body:
             if self.openapi_version.startswith("3."):
-                for status_code in response_body.keys():
+                for status_code in response_body:
                     for content_type in (
                         response_body.get(status_code, {}).get("content", {}).keys()
                     ):

@@ -1,12 +1,12 @@
+import builtins
 import importlib.metadata
+import keyword
 import re
 from functools import cache
 from pathlib import Path
-from subprocess import run, PIPE
-from typing import Optional
+from subprocess import PIPE, run
 from urllib.parse import urlparse
-import builtins
-import keyword
+
 from datamodel_code_generator.reference import FieldNameResolver
 
 
@@ -36,13 +36,13 @@ def rename_python_builtins(name: str) -> str:
     return name
 
 
-def create_and_write_file(file_path: Path, text: Optional[str] = None) -> None:
+def create_and_write_file(file_path: Path, text: str | None = None) -> None:
     file_path.parent.mkdir(parents=True, exist_ok=True)
     if text:
         file_path.write_text(text, encoding="utf-8")
 
 
-def run_command(command: str) -> tuple[int, Optional[str]]:
+def run_command(command: str) -> tuple[int, str | None]:
     result = run(command, shell=True, stderr=PIPE, text=True)  # noqa: S602
     stderr = result.stderr
     return result.returncode, stderr

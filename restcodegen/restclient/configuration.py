@@ -1,11 +1,12 @@
-from httpx import URL
 from typing import Any
+
+from httpx import URL
 
 
 class Configuration:
     def __init__(
         self, *, base_url: URL | str = "", disable_log: bool = False, **kwargs: Any
-    ):
+    ) -> None:
         """
         Parameters:
             base_url (optional):

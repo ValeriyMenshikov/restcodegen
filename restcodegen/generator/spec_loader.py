@@ -1,7 +1,6 @@
 import json
 from pathlib import Path
-from typing import Union
-from pydantic import HttpUrl
+
 import httpx
 
 from restcodegen.generator.log import LOGGER
@@ -25,7 +24,7 @@ class SpecLoader:
         )
         self._patcher = SpecPatcher()
 
-    def _get_spec_by_url(self) -> Union[dict, None]:
+    def _get_spec_by_url(self) -> dict | None:
         try:
             response = httpx.get(self.spec_path, timeout=5)
             response.raise_for_status()
@@ -39,7 +38,7 @@ class SpecLoader:
             )
             if Path(file_path).is_file():
                 LOGGER.warning(f"Try open OpenAPI spec by path: {file_path}")
-                with open(file_path, "r") as f:
+                with open(file_path) as f:
                     spec = self._patcher.patch(json.loads(f.read()))
             return spec
         else:
@@ -50,7 +49,7 @@ class SpecLoader:
 
     def _get_spec_from_cache(self) -> dict:
         try:
-            with open(self.cache_spec_path, "r") as f:
+            with open(self.cache_spec_path) as f:
                 spec = self._patcher.patch(json.loads(f.read()))
                 self.spec_path = self.cache_spec_path  # type: ignore
                 LOGGER.warning(f"OpenAPI spec got from cash: {self.spec_path}")
@@ -60,9 +59,9 @@ class SpecLoader:
                 f"OpenAPI spec not available from url: {self.spec_path}, and not found in cash"
             ) from e
 
-    def _get_spec_by_path(self) -> Union[dict, None]:
+    def _get_spec_by_path(self) -> dict | None:
         try:
-            with open(self.spec_path, "r") as f:
+            with open(self.spec_path) as f:
                 spec = json.loads(f.read())
         except FileNotFoundError:
             LOGGER.warning(f"OpenAPI spec not found from local path: {self.spec_path}")
