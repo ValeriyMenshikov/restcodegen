@@ -212,6 +212,22 @@ tomli = {version = "*", optional = true, markers = "python_full_version <= \"3.1
 toml = ["tomli"]
 
 [[package]]
+name = "coverage-lcov"
+version = "0.2.5"
+description = "A simple .coverage to LCOV converter"
+optional = false
+python-versions = ">=3.6.3,<4.0.0"
+files = [
+    {file = "coverage-lcov-0.2.5.tar.gz", hash = "sha256:ca66692a12c686f337582209d338238a1aafa74149f134387555e719eac4e1e8"},
+    {file = "coverage_lcov-0.2.5-py3-none-any.whl", hash = "sha256:841f58e4ceba3adb01662a2eb9490b10dd193fabaaf348f7469c55a5940d5d89"},
+]
+
+[package.dependencies]
+click = ">=7.1.2"
+coverage = {version = ">=5.5", extras = ["toml"]}
+types-toml = ">=0.1.5,<0.2.0"
+
+[[package]]
 name = "curlify2"
 version = "2.0.0"
 description = "Library to convert python requests and httpx object to curl command."
@@ -1044,6 +1060,17 @@ files = [
 ]
 
 [[package]]
+name = "types-toml"
+version = "0.1.5"
+description = "Typing stubs for toml"
+optional = false
+python-versions = "*"
+files = [
+    {file = "types-toml-0.1.5.tar.gz", hash = "sha256:fc5e1df92c245404e4360c63568e9f0e732b0cabea7a220a4788d52b78f5dc59"},
+    {file = "types_toml-0.1.5-py3-none-any.whl", hash = "sha256:dd00526680595aad0eade682bd8a9e9513e9b4b8932daed159925fe446fc90a9"},
+]
+
+[[package]]
 name = "typing-extensions"
 version = "4.14.0"
 description = "Backported and Experimental Type Hints for Python 3.9+"
@@ -1085,4 +1112,4 @@ dev = ["black (>=19.3b0)", "pytest (>=4.6.2)"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.10"
-content-hash = "f1f49d7d3aa8676adfd7f72b83f715f84242cc70ede8abc12fd61e6bfe1f3d82"
+content-hash = "6408058a187a5e849baed13ed2d96636ead89dfd99e87aec56dad76e8bdc2f95"
