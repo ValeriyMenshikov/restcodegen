@@ -1,17 +1,13 @@
 import json
 from pathlib import Path
+
 from datamodel_code_generator import DataModelType, generate
-from typing import (
-    Optional,
-)
 
 from restcodegen.generator.base import BaseTemplateGenerator
 from restcodegen.generator.log import LOGGER
-from restcodegen.generator.parser import OpenAPISpec
+from restcodegen.generator.parser import Parser
 from restcodegen.generator.utils import (
     create_and_write_file,
-)
-from restcodegen.generator.utils import (
     name_to_snake,
 )
 
@@ -21,8 +17,8 @@ class RESTClientGenerator(BaseTemplateGenerator):
 
     def __init__(
         self,
-        openapi_spec: OpenAPISpec,
-        templates_dir: Optional[Path] = None,
+        openapi_spec: Parser,
+        templates_dir: Path | None = None,
         async_mode: bool = False,
     ) -> None:
         super().__init__(templates_dir=templates_dir)

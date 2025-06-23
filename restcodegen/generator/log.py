@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import sys
 from enum import Enum
-from typing import Optional
 
 import loguru
 from pydantic_settings import BaseSettings
@@ -21,7 +20,7 @@ class LoggerSettings(BaseSettings):
     log_level: LogLevelEnum = LogLevelEnum.DEBUG
 
 
-def build_root_logger(log_settings: Optional[LoggerSettings] = None) -> loguru.Logger:
+def build_root_logger(log_settings: LoggerSettings | None = None) -> loguru.Logger:
     log_settings_ = log_settings or LoggerSettings()
     loguru.logger.remove()
     if log_settings_.log_json:

@@ -1,8 +1,8 @@
 [tool.poetry]
 name = "restcodegen"
-version = "1.0.3"
+version = "1.1.0"
 description = ""
-authors = ["Menshikov Valeriy Sergeevich <vmenshikov@ozon.ru>"]
+authors = ["Menshikov Valeriy Sergeevich <valeriy.menshikov.1989@gmail.com>"]
 readme = "README.md"
 packages = [{ include = "restcodegen" }]
 
@@ -22,6 +22,8 @@ structlog = "^25.1.0"
 [tool.poetry.group.dev.dependencies]
 mypy = "^1.14.1"
 pytest = "^8.3.5"
+pytest-cov = "^6.2.1"
+coverage-lcov = "^0.2.2"
 
 [build-system]
 requires = ["poetry-core"]
@@ -29,3 +31,32 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry.scripts]
 restcodegen = "restcodegen.cli.main:cli"
+
+[tool.pytest.ini_options]
+addopts = """
+  -s
+  -vv
+  --cov restcodegen
+  --cov-report term
+  --cov-report html
+  --cov-report xml:coverage.xml
+  --cov-report term-missing
+  --cov-report xml:coverage.xml
+  --disable-pytest-warnings
+  --durations=10
+  --junitxml=junit.xml
+  -x
+"""
+#  --cov-fail-under=80
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true

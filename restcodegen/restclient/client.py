@@ -1,9 +1,10 @@
-from typing import Any
 import json
-import httpx
-from json.decoder import JSONDecodeError
-import structlog
 import uuid
+from json.decoder import JSONDecodeError
+from typing import Any
+
+import httpx
+import structlog
 from curlify2 import Curlify
 
 from restcodegen.restclient.configuration import Configuration

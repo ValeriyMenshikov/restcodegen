@@ -1,12 +1,16 @@
 import shutil
 from pathlib import Path
-from typing import Optional
 
 from jinja2 import Environment, FileSystemLoader
 
 from restcodegen.generator import TEMPLATES
 from restcodegen.generator.log import LOGGER
-from restcodegen.generator.utils import name_to_snake, snake_to_camel, get_version, rename_python_builtins
+from restcodegen.generator.utils import (
+    get_version,
+    name_to_snake,
+    rename_python_builtins,
+    snake_to_camel,
+)
 
 
 class BaseGenerator:
@@ -32,7 +36,7 @@ class BaseGenerator:
 
 
 class BaseTemplateGenerator(BaseGenerator):
-    def __init__(self, templates_dir: Optional[Path] = None):
+    def __init__(self, templates_dir: Path | None = None):
         super().__init__()
         self.templates_dir = templates_dir or TEMPLATES
         self.version = get_version()

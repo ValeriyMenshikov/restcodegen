@@ -1,10 +1,12 @@
 # RestCodeGen
 
-<p align="center">
-  <img src="https://img.shields.io/badge/Python-3.10+-blue.svg" alt="Python Version">
-  <img src="https://img.shields.io/badge/License-MIT-green.svg" alt="License">
-  <img src="https://img.shields.io/badge/Version-1.0.2-orange.svg" alt="Version">
-</p>
+[![PyPI version](https://img.shields.io/pypi/v/restcodegen.svg)](https://pypi.org/project/restcodegen)
+[![Python versions](https://img.shields.io/pypi/pyversions/restcodegen.svg)](https://pypi.python.org/pypi/restcodegen)
+[![GitHub Actions](https://img.shields.io/github/actions/workflow/status/ValeriyMenshikov/restcodegen/python-test.yml?branch=main)](https://github.com/ValeriyMenshikov/restcodegen/actions/workflows/python-test.yml)
+[![Coverage Status](https://coveralls.io/repos/github/ValeriyMenshikov/restcodegen/badge.svg?branch=main)](https://coveralls.io/github/ValeriyMenshikov/restcodegen?branch=main)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/ValeriyMenshikov/restcodegen/blob/main/LICENSE)
+[![Downloads](https://img.shields.io/pypi/dm/restcodegen.svg)](https://pypistats.org/packages/restcodegen)
+[![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
 
 <p align="center">
   <b>Generate Python clients from OpenAPI specifications with ease</b>
@@ -25,7 +27,7 @@ RestCodeGen is a powerful tool for automatically generating Python client librar
 
 ## 📦 Installation
 
-RestCodeGen requires Python 3.10 or higher. Install it using pip:
+RestCodeGen requires Python 3.11 or higher. Install it using pip:
 
 ```bash
 pip install restcodegen
