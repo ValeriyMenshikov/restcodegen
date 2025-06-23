@@ -39,9 +39,11 @@ jobs:
     
     - name: Run tests with coverage
       run: |
-        poetry run pytest --cov=restcodegen --cov-report=xml
+        poetry run pytest
     
-    - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v2
+    - name: Comment coverage on PR
+      if: github.event_name == 'pull_request'
+      uses: MishaKav/pytest-coverage-comment@main
       with:
-        file: coverage.xml
+        pytest-coverage-path: ./coverage.xml
+        junitxml-path: ./junit.xml

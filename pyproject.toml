@@ -43,6 +43,7 @@ addopts = """
   --cov-report xml:coverage.xml
   --disable-pytest-warnings
   --durations=10
+  --junitxml=junit.xml
   -x
 """
 #  --cov-fail-under=80
