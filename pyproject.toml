@@ -22,6 +22,7 @@ structlog = "^25.1.0"
 [tool.poetry.group.dev.dependencies]
 mypy = "^1.14.1"
 pytest = "^8.3.5"
+pytest-cov = "^6.2.1"
 
 [build-system]
 requires = ["poetry-core"]
@@ -45,3 +46,19 @@ addopts = """
   -x
 """
 #  --cov-fail-under=80
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+select = ["E", "F", "I", "N", "UP", "ANN", "B", "A", "C4", "SIM", "ARG"]
+ignore = ["ANN101", "ANN102"]
+
+[tool.ruff.isort]
+known-first-party = ["restcodegen"]
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
