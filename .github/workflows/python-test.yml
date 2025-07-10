@@ -41,16 +41,20 @@ jobs:
       run: |
         poetry run mypy restcodegen
     
-    - name: Run tests with coverage
+    - name: Run tests
       run: |
-        poetry run pytest --cov=restcodegen --cov-report=xml
-        poetry run coverage lcov
-      env:
-        COVERALLS_REPO_TOKEN: ${{ secrets.COVERALLS_REPO_TOKEN }}
+        poetry run pytest
     
-    - name: Upload coverage to Coveralls
-      uses: coverallsapp/github-action@v2
-      with:
-        github-token: ${{ secrets.GITHUB_TOKEN }}
-        path-to-lcov: ./coverage.lcov
-        format: lcov
+    # - name: Run tests with coverage
+    #   run: |
+    #     poetry run pytest --cov=restcodegen --cov-report=xml
+    #     poetry run coverage lcov
+    #   env:
+    #     COVERALLS_REPO_TOKEN: ${{ secrets.COVERALLS_REPO_TOKEN }}
+    
+    # - name: Upload coverage to Coveralls
+    #   uses: coverallsapp/github-action@v2
+    #   with:
+    #     github-token: ${{ secrets.GITHUB_TOKEN }}
+    #     path-to-lcov: ./coverage.lcov
+    #     format: lcov
