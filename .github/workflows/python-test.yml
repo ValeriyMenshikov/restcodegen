@@ -14,47 +14,43 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: [3.11]
+        python-version: [ 3.11 ]
 
     steps:
-    - uses: actions/checkout@v4
-    
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v4
-      with:
-        python-version: ${{ matrix.python-version }}
-    
-    - name: Install Poetry
-      run: |
-        curl -sSL https://install.python-poetry.org | python3 -
-        poetry --version
-    
-    - name: Install dependencies
-      run: |
-        poetry install --with dev
-    
-    - name: Lint with ruff
-      run: |
-        poetry run ruff check restcodegen
-    
-    - name: Type check with mypy
-      run: |
-        poetry run mypy restcodegen
-    
-    - name: Run tests
-      run: |
-        poetry run pytest
-    
-    # - name: Run tests with coverage
-    #   run: |
-    #     poetry run pytest --cov=restcodegen --cov-report=xml
-    #     poetry run coverage lcov
-    #   env:
-    #     COVERALLS_REPO_TOKEN: ${{ secrets.COVERALLS_REPO_TOKEN }}
-    
-    # - name: Upload coverage to Coveralls
-    #   uses: coverallsapp/github-action@v2
-    #   with:
-    #     github-token: ${{ secrets.GITHUB_TOKEN }}
-    #     path-to-lcov: ./coverage.lcov
-    #     format: lcov
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install Poetry
+        run: |
+          curl -sSL https://install.python-poetry.org | python3 -
+          poetry --version
+
+      - name: Install dependencies
+        run: |
+          poetry install --with dev
+
+      - name: Lint with ruff
+        run: |
+          poetry run ruff check restcodegen
+
+      - name: Type check with mypy
+        run: |
+          poetry run mypy restcodegen
+
+      - name: Run tests with coverage
+        run: |
+          poetry run pytest --cov=restcodegen --cov-report=xml
+          poetry run coverage lcov
+        env:
+          COVERALLS_REPO_TOKEN: ${{ secrets.COVERALLS_REPO_TOKEN }}
+
+      - name: Upload coverage to Coveralls
+        uses: coverallsapp/github-action@v2
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path-to-lcov: ./coverage.lcov
+          format: lcov
