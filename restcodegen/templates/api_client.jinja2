@@ -15,7 +15,7 @@ from restcodegen.restclient import AsyncClient
 from restcodegen.restclient import Client
 {% endif %}
 {% if models %}
-from clients.http.{{ service_name|to_snake_case }}.models.api_models import (
+from {{ base_import }}.{{ service_name|to_snake_case }}.models.api_models import (
     {% for model in models %}
     {{ model }},
     {% endfor %}

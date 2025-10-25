@@ -48,8 +48,21 @@ def cli() -> None: ...
     help="Path to custom API client template",
     default=None,
 )
+@click.option(
+    "--output-dir",
+    "-o",
+    required=False,
+    type=click.Path(file_okay=False),
+    help="Output directory for generated clients (default: ./clients/http)",
+    default=None,
+)
 def generate_command(
-    url: str, service_name: str, async_mode: bool, api_tags: str | None, templates_dir: str | None
+    url: str,
+    service_name: str,
+    async_mode: bool,
+    api_tags: str | None,
+    templates_dir: str | None,
+    output_dir: str | None,
 ) -> None:
     parser = Parser(
         openapi_spec=url,
@@ -60,9 +73,10 @@ def generate_command(
         openapi_spec=parser,
         async_mode=async_mode,
         templates_dir=templates_dir,
+        base_path=output_dir,
     )
     gen.generate()
-    format_file()
+    format_file(output_dir)
 
 
 cli.add_command(generate_command)

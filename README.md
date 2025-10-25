@@ -27,7 +27,7 @@ RestCodeGen is a powerful tool for automatically generating Python client librar
 
 ## 📦 Installation
 
-RestCodeGen requires Python 3.11 or higher. Install it using pip:
+RestCodeGen requires Python 3.10 or higher. Install it using pip:
 
 ```bash
 pip install restcodegen
@@ -56,6 +56,7 @@ restcodegen generate -u "http://example.com/openapi.json" -s "my-service" -a fal
 | `--async-mode` | `-a` | Enable asynchronous client generation | No | `false` |
 | `--api-tags` | `-t` | Comma-separated list of API tags to generate | No | All APIs |
 | `--templates-dir` | `-td` | Path to directory with custom Jinja2 templates | No | Built-in templates |
+| `--output-dir` | `-o` | Output directory for generated clients (root package path) | No | `./clients/http` |
 
 ### Example
 
@@ -73,6 +74,12 @@ Generate a client using custom templates:
 restcodegen generate -u "https://petstore3.swagger.io/api/v3/openapi.json" -s "petstore" -a false -td ./custom_templates
 ```
 
+Generate a client into a custom output directory (imports will follow this base path):
+
+```bash
+restcodegen generate -u "https://petstore3.swagger.io/api/v3/openapi.json" -s "petstore" -o framework/internal
+```
+
 ### Custom Templates
 
 You can provide your own Jinja2 templates to customize the generated code. Place your template files in a directory and specify the path using the `--templates-dir` (`-td`) option. The following template files are supported:
@@ -82,6 +89,20 @@ You can provide your own Jinja2 templates to customize the generated code. Place
 - `apis_init.jinja2` - Data model template
 
 To customize the output, copy the default templates from the package's `templates` directory and modify them as needed.
+
+### Output Directory and Imports
+
+When you specify `--output-dir` (`-o`), the generated package structure is created under that directory, for example:
+
+```
+framework/
+  internal/
+    petstore/
+      apis/
+      models/
+```
+
+All generated imports are based on the base path you provide (e.g. `framework.internal.petstore...`). If `-o` is not provided, the default base path is `clients/http`.
 
 ## 📁 Generated Structure
 

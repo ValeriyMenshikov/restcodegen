@@ -42,26 +42,21 @@ def create_and_write_file(file_path: Path, text: str | None = None) -> None:
         file_path.write_text(text, encoding="utf-8")
 
 
-def run_command(command: str) -> tuple[int, str | None]:
-    result = run(command, shell=True, stderr=PIPE, text=True)  # noqa: S602
+def run_command(command: str | list[str]) -> tuple[int, str | None]:
+    if isinstance(command, list):
+        result = run(command, shell=False, stderr=PIPE, text=True)
+    else:
+        result = run(command, shell=True, stderr=PIPE, text=True)  # noqa: S602
     stderr = result.stderr
     return result.returncode, stderr
 
 
-def format_file() -> None:
-    command_format = [
-        "ruff",
-        "format",
-        "./clients/http",
-    ]
-    run_command(" ".join(command_format))
-    command_check = [
-        "ruff",
-        "check",
-        "./clients/http",
-        "--fix",
-    ]
-    run_command(" ".join(command_check))
+def format_file(output_dir: str | None = None) -> None:
+    target = output_dir if output_dir is not None else "./clients/http"
+    command_format = ["ruff", "format", target]
+    run_command(command_format)
+    command_check = ["ruff", "check", target, "--fix"]
+    run_command(command_check)
 
 
 @cache

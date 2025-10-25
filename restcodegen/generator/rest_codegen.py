@@ -1,4 +1,5 @@
 import json
+from functools import cached_property
 from pathlib import Path
 
 from datamodel_code_generator import DataModelType, generate
@@ -20,10 +21,22 @@ class RESTClientGenerator(BaseTemplateGenerator):
         openapi_spec: Parser,
         templates_dir: str | None = None,
         async_mode: bool = False,
+        base_path: str | Path | None = None,
     ) -> None:
         super().__init__(templates_dir=templates_dir)
         self.openapi_spec = openapi_spec
         self.async_mode = async_mode
+        self.base_path = Path(base_path) if base_path is not None else self.BASE_PATH
+
+    @cached_property
+    def _base_import(self) -> str:
+        base = self.base_path
+        if base.is_absolute():
+            try:
+                base = base.relative_to(Path.cwd())
+            except ValueError:
+                pass
+        return ".".join(list(base.parts))
 
     def generate(self) -> None:
         self._gen_clients()
@@ -36,9 +49,10 @@ class RESTClientGenerator(BaseTemplateGenerator):
             api_names=self.openapi_spec.apis,
             service_name=self.openapi_spec.service_name,
             version=self.version,
+            base_import=self._base_import,
         )
         file_name = f"{name_to_snake(self.openapi_spec.service_name)}/__init__.py"
-        file_path = self.BASE_PATH / file_name
+        file_path = self.base_path / file_name
         create_and_write_file(file_path=file_path, text=rendered_code)
         create_and_write_file(file_path=file_path.parent.parent / "__init__.py", text="# coding: utf-8")
 
@@ -54,15 +68,16 @@ class RESTClientGenerator(BaseTemplateGenerator):
                 api_name=tag,
                 service_name=self.openapi_spec.service_name,
                 version=self.version,
+                base_import=self._base_import,
             )
             file_name = f"{name_to_snake(tag)}_api.py"
-            file_path = self.BASE_PATH / name_to_snake(self.openapi_spec.service_name) / "apis" / file_name
+            file_path = self.base_path / name_to_snake(self.openapi_spec.service_name) / "apis" / file_name
             create_and_write_file(file_path=file_path, text=rendered_code)
             create_and_write_file(file_path=file_path.parent / "__init__.py", text="# coding: utf-8")
 
     def _gen_models(self) -> None:
         LOGGER.info(f"Generate models for service: {self.openapi_spec.service_name}")
-        file_path = self.BASE_PATH / name_to_snake(self.openapi_spec.service_name) / "models" / "api_models.py"
+        file_path = self.base_path / name_to_snake(self.openapi_spec.service_name) / "models" / "api_models.py"
         create_and_write_file(file_path=file_path)
         create_and_write_file(file_path=file_path.parent / "__init__.py", text="# coding: utf-8")
         header_path_template = self.templates_dir / "header.jinja2"
