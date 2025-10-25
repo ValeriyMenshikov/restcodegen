@@ -36,13 +36,11 @@ class BaseGenerator:
 
 
 class BaseTemplateGenerator(BaseGenerator):
-    def __init__(self, templates_dir: Path | None = None):
+    def __init__(self, templates_dir: str | None = None):
         super().__init__()
-        self.templates_dir = templates_dir or TEMPLATES
+        self.templates_dir = Path(templates_dir) if templates_dir is not None else TEMPLATES
         self.version = get_version()
-        self.env = Environment(
-            loader=FileSystemLoader(self.templates_dir), autoescape=True
-        )  # type: ignore
+        self.env = Environment(loader=FileSystemLoader(self.templates_dir), autoescape=True)  # type: ignore
         self.env.filters["to_snake_case"] = name_to_snake
         self.env.filters["to_camel_case"] = snake_to_camel
         self.env.filters["rename_python_builtins"] = rename_python_builtins

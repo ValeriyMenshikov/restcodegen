@@ -115,12 +115,7 @@ class Parser:
                         return model_name
         else:
             for content_type in request_body.get("content", {}).keys():
-                schema = (
-                    request_body.get("content", {})
-                    .get(content_type, {})
-                    .get("schema", {})
-                    .get("$ref", None)
-                )
+                schema = request_body.get("content", {}).get(content_type, {}).get("schema", {}).get("$ref", None)
                 if schema:
                     model_name = snake_to_camel(schema.split("/")[-1])
                     return model_name
@@ -131,9 +126,7 @@ class Parser:
         if response_body:
             if self.openapi_version.startswith("3."):
                 for status_code in response_body:
-                    for content_type in (
-                        response_body.get(status_code, {}).get("content", {}).keys()
-                    ):
+                    for content_type in response_body.get(status_code, {}).get("content", {}).keys():
                         schema = (
                             response_body.get(status_code, {})
                             .get("content", {})
@@ -158,9 +151,7 @@ class Parser:
         return responses
 
     def _get_headers(self, parameters: list[dict]) -> list[BaseParameter]:
-        params = self._get_params_with_types(
-            parameters, param_type=ParameterType.HEADER
-        )
+        params = self._get_params_with_types(parameters, param_type=ParameterType.HEADER)
         return params
 
     def _get_path_parameters(self, parameters: list[dict]) -> list[BaseParameter]:
@@ -172,9 +163,7 @@ class Parser:
         return params
 
     @staticmethod
-    def _get_params_with_types(
-        parameters: list[dict], param_type: ParameterType
-    ) -> list[BaseParameter]:
+    def _get_params_with_types(parameters: list[dict], param_type: ParameterType) -> list[BaseParameter]:
         params: list[BaseParameter] = []
         if not parameters:
             return params
@@ -200,14 +189,10 @@ class Parser:
 
                 parameter_with_desc = BaseParameter(
                     name=parameter_name,
-                    type_=parameter_type
-                    if enum
-                    else TYPE_MAP[str(parameter_type).lower()],
+                    type_=parameter_type if enum else TYPE_MAP[str(parameter_type).lower()],
                     description=parameter_description,
                     required=parameter_is_required,
-                    default=DEFAULT_HEADER_VALUE_MAP.get(
-                        TYPE_MAP.get(parameter_type, "")
-                    ),
+                    default=DEFAULT_HEADER_VALUE_MAP.get(TYPE_MAP.get(parameter_type, "")),
                 )
 
                 params.append(parameter_with_desc)
@@ -252,9 +237,7 @@ class Parser:
         info = self.openapi_spec.get("info", {})
         self.version = info.get("version", "1.0.0")
         self.description = info.get("description", "")
-        self.openapi_version = self.openapi_spec.get(
-            "openapi", ""
-        ) or self.openapi_spec.get("swagger", "")
+        self.openapi_version = self.openapi_spec.get("openapi", "") or self.openapi_spec.get("swagger", "")
 
         if self.openapi_version.startswith("2."):
             LOGGER.warning(
@@ -280,9 +263,7 @@ class Parser:
         query_parameters = self._get_query_parameters(parameters)
         path_parameters = self._get_path_parameters(parameters)
         headers = self._get_headers(parameters)
-        request_body = self._get_request_body(
-            details.get("requestBody", details.get("parameters", {}))
-        )
+        request_body = self._get_request_body(details.get("requestBody", details.get("parameters", {})))
         responses = self._get_response_body(details.get("responses", {}))
 
         if not path_parameters:

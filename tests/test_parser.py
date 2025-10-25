@@ -1,9 +1,5 @@
 import pytest
-from unittest.mock import patch, \
-    MagicMock
-from typing import Any, \
-    Dict, \
-    List
+from unittest.mock import patch, MagicMock
 
 from restcodegen.generator.parser import Parser
 
@@ -12,11 +8,7 @@ from restcodegen.generator.parser import Parser
 def sample_openapi_spec() -> dict:
     return {
         "openapi": "3.0.0",
-        "info": {
-            "title": "Test API",
-            "version": "1.0.0",
-            "description": "API for testing"
-        },
+        "info": {"title": "Test API", "version": "1.0.0", "description": "API for testing"},
         "paths": {
             "/users": {
                 "get": {
@@ -26,73 +18,38 @@ def sample_openapi_spec() -> dict:
                     "responses": {
                         "200": {
                             "description": "OK",
-                            "content": {
-                                "application/json": {
-                                    "schema": {
-                                        "$ref": "#/components/schemas/UserList"
-                                    }
-                                }
-                            }
+                            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/UserList"}}},
                         }
-                    }
+                    },
                 },
                 "post": {
                     "operationId": "createUser",
                     "tags": ["users"],
                     "summary": "Create user",
-                    "requestBody": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/User"
-                                }
-                            }
-                        }
-                    },
+                    "requestBody": {"content": {"application/json": {"schema": {"$ref": "#/components/schemas/User"}}}},
                     "responses": {
                         "201": {
                             "description": "Created",
-                            "content": {
-                                "application/json": {
-                                    "schema": {
-                                        "$ref": "#/components/schemas/User"
-                                    }
-                                }
-                            }
+                            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/User"}}},
                         }
-                    }
-                }
+                    },
+                },
             },
             "/posts": {
                 "get": {
                     "operationId": "getPosts",
                     "tags": ["posts"],
                     "summary": "Get posts",
-                    "parameters": [
-                        {
-                            "name": "userId",
-                            "in": "query",
-                            "required": False,
-                            "schema": {
-                                "type": "integer"
-                            }
-                        }
-                    ],
+                    "parameters": [{"name": "userId", "in": "query", "required": False, "schema": {"type": "integer"}}],
                     "responses": {
                         "200": {
                             "description": "OK",
-                            "content": {
-                                "application/json": {
-                                    "schema": {
-                                        "$ref": "#/components/schemas/PostList"
-                                    }
-                                }
-                            }
+                            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/PostList"}}},
                         }
-                    }
+                    },
                 }
-            }
-        }
+            },
+        },
     }
 
 

@@ -19,9 +19,7 @@ class SpecLoader:
         if not self.cache_spec_dir.exists():
             self.cache_spec_dir.mkdir(parents=True, exist_ok=True)
 
-        self.cache_spec_path = (
-            self.cache_spec_dir / f"{name_to_snake(self.service_name)}.json"
-        )
+        self.cache_spec_path = self.cache_spec_dir / f"{name_to_snake(self.service_name)}.json"
         self._patcher = SpecPatcher()
 
     def _get_spec_by_url(self) -> dict | None:
@@ -31,11 +29,7 @@ class SpecLoader:
         except httpx.HTTPError:
             spec = {}
             LOGGER.warning(f"OpenAPI spec not available by url: {self.spec_path} ")
-            file_path = (
-                self.spec_path
-                if Path(self.spec_path).is_file()
-                else str(self.cache_spec_path)
-            )
+            file_path = self.spec_path if Path(self.spec_path).is_file() else str(self.cache_spec_path)
             if Path(file_path).is_file():
                 LOGGER.warning(f"Try open OpenAPI spec by path: {file_path}")
                 with open(file_path) as f:
