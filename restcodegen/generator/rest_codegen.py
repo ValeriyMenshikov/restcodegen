@@ -18,7 +18,7 @@ class RESTClientGenerator(BaseTemplateGenerator):
     def __init__(
         self,
         openapi_spec: Parser,
-        templates_dir: Path | None = None,
+        templates_dir: str | None = None,
         async_mode: bool = False,
     ) -> None:
         super().__init__(templates_dir=templates_dir)
@@ -40,9 +40,7 @@ class RESTClientGenerator(BaseTemplateGenerator):
         file_name = f"{name_to_snake(self.openapi_spec.service_name)}/__init__.py"
         file_path = self.BASE_PATH / file_name
         create_and_write_file(file_path=file_path, text=rendered_code)
-        create_and_write_file(
-            file_path=file_path.parent.parent / "__init__.py", text="# coding: utf-8"
-        )
+        create_and_write_file(file_path=file_path.parent.parent / "__init__.py", text="# coding: utf-8")
 
     def _gen_clients(self) -> None:
         for tag in self.openapi_spec.apis:
@@ -58,29 +56,15 @@ class RESTClientGenerator(BaseTemplateGenerator):
                 version=self.version,
             )
             file_name = f"{name_to_snake(tag)}_api.py"
-            file_path = (
-                self.BASE_PATH
-                / name_to_snake(self.openapi_spec.service_name)
-                / "apis"
-                / file_name
-            )
+            file_path = self.BASE_PATH / name_to_snake(self.openapi_spec.service_name) / "apis" / file_name
             create_and_write_file(file_path=file_path, text=rendered_code)
-            create_and_write_file(
-                file_path=file_path.parent / "__init__.py", text="# coding: utf-8"
-            )
+            create_and_write_file(file_path=file_path.parent / "__init__.py", text="# coding: utf-8")
 
     def _gen_models(self) -> None:
         LOGGER.info(f"Generate models for service: {self.openapi_spec.service_name}")
-        file_path = (
-            self.BASE_PATH
-            / name_to_snake(self.openapi_spec.service_name)
-            / "models"
-            / "api_models.py"
-        )
+        file_path = self.BASE_PATH / name_to_snake(self.openapi_spec.service_name) / "models" / "api_models.py"
         create_and_write_file(file_path=file_path)
-        create_and_write_file(
-            file_path=file_path.parent / "__init__.py", text="# coding: utf-8"
-        )
+        create_and_write_file(file_path=file_path.parent / "__init__.py", text="# coding: utf-8")
         header_path_template = self.templates_dir / "header.jinja2"
         generate(
             json.dumps(self.openapi_spec.openapi_spec),

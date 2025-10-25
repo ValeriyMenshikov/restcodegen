@@ -66,10 +66,7 @@ def format_file() -> None:
 
 @cache
 def get_dependencies() -> list[dict[str, str]]:
-    deps = [
-        {"path": dep.name, "version": dep.version}
-        for dep in importlib.metadata.distributions()
-    ]  # type: ignore[attr-defined]
+    deps = [{"path": dep.name, "version": dep.version} for dep in importlib.metadata.distributions()]  # type: ignore[attr-defined]
 
     return sorted(deps, key=lambda x: x["path"].lower())
 

@@ -55,14 +55,33 @@ restcodegen generate -u "http://example.com/openapi.json" -s "my-service" -a fal
 | `--service-name` | `-s` | Name of the service | Yes | - |
 | `--async-mode` | `-a` | Enable asynchronous client generation | No | `false` |
 | `--api-tags` | `-t` | Comma-separated list of API tags to generate | No | All APIs |
+| `--templates-dir` | `-td` | Path to directory with custom Jinja2 templates | No | Built-in templates |
 
 ### Example
 
-Generate a client for the Petstore API:
+### Examples
+
+Generate a client for the Petstore API with default templates:
 
 ```bash
 restcodegen generate -u "https://petstore3.swagger.io/api/v3/openapi.json" -s "petstore" -a false
 ```
+
+Generate a client using custom templates:
+
+```bash
+restcodegen generate -u "https://petstore3.swagger.io/api/v3/openapi.json" -s "petstore" -a false -td ./custom_templates
+```
+
+### Custom Templates
+
+You can provide your own Jinja2 templates to customize the generated code. Place your template files in a directory and specify the path using the `--templates-dir` (`-td`) option. The following template files are supported:
+
+- `api_client.jinja2` - Main API client template
+- `header.jinja2` - File header template (for license and imports)
+- `apis_init.jinja2` - Data model template
+
+To customize the output, copy the default templates from the package's `templates` directory and modify them as needed.
 
 ## 📁 Generated Structure
 

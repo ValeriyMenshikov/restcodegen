@@ -75,13 +75,7 @@ def schema_with_dots() -> dict:
                     "responses": {
                         "200": {
                             "description": "OK",
-                            "content": {
-                                "application/json": {
-                                    "schema": {
-                                        "$ref": "#/components/schemas/User.Profile"
-                                    }
-                                }
-                            },
+                            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/User.Profile"}}},
                         }
                     },
                 }
@@ -189,17 +183,17 @@ def test_extract_inline_schemas(simple_swagger_schema: dict) -> None:
     """Test that inline schemas are extracted to components/schemas."""
     patcher = SpecPatcher()
     patched = patcher.patch(simple_swagger_schema)
-    
+
     assert "components" in patched
     assert "schemas" in patched["components"]
-    
+
     assert "create_post_request_body" in patched["components"]["schemas"]
     assert "create_post_response_201" in patched["components"]["schemas"]
-    
+
     request_schema = patched["paths"]["/posts"]["post"]["requestBody"]["content"]["application/json"]["schema"]
     assert "$ref" in request_schema
     assert request_schema["$ref"] == "#/components/schemas/create_post_request_body"
-    
+
     response_schema = patched["paths"]["/posts"]["post"]["responses"]["201"]["content"]["application/json"]["schema"]
     assert "$ref" in response_schema
     assert response_schema["$ref"] == "#/components/schemas/create_post_response_201"
@@ -209,14 +203,14 @@ def test_replace_dots_in_schema_names(schema_with_dots: dict) -> None:
     """Test that dots in schema names are replaced."""
     patcher = SpecPatcher()
     patched = patcher.patch(schema_with_dots)
-    
+
     assert "User.Profile" not in patched["components"]["schemas"]
     assert "UserProfile" in patched["components"]["schemas"]
-    
+
     ref = patched["paths"]["/users"]["get"]["responses"]["200"]["content"]["application/json"]["schema"]["$ref"]
     assert "User.Profile" not in ref
     assert "UserProfile" in ref
-    
+
     assert "users.management" not in patched["paths"]["/users"]["get"]["tags"]
     assert "usersmanagement" in patched["paths"]["/users"]["get"]["tags"]
 
@@ -225,17 +219,17 @@ def test_extract_nested_objects(schema_with_nested_objects: dict) -> None:
     """Test that nested objects are extracted to components/schemas."""
     patcher = SpecPatcher()
     patched = patcher.patch(schema_with_nested_objects)
-    
+
     schemas = patched["components"]["schemas"]
     assert "create_user_request_body" in schemas
     assert "create_user_request_body_address" in schemas
     assert "create_user_request_body_contacts_item" in schemas
-    
+
     address_schema = schemas["create_user_request_body_address"]
     assert address_schema["type"] == "object"
     assert "street" in address_schema["properties"]
     assert "city" in address_schema["properties"]
-    
+
     contacts_schema = schemas["create_user_request_body"]["properties"]["contacts"]
     assert contacts_schema["type"] == "array"
     assert "$ref" in contacts_schema["items"]
@@ -246,14 +240,14 @@ def test_extract_combined_schemas(schema_with_combined_schemas: dict) -> None:
     """Test that combined schemas (oneOf, anyOf, allOf) are extracted."""
     patcher = SpecPatcher()
     patched = patcher.patch(schema_with_combined_schemas)
-    
+
     schemas = patched["components"]["schemas"]
     assert "create_product_request_body" in schemas
     assert "create_product_request_body_oneOf_0" in schemas
     assert "create_product_request_body_oneOf_1" in schemas
-    
+
     assert "create_product_request_body_oneOf_0_dimensions" in schemas
-    
+
     oneof_schema = schemas["create_product_request_body"]["oneOf"]
     assert len(oneof_schema) == 2
     assert "$ref" in oneof_schema[0]
@@ -267,8 +261,8 @@ def test_idempotent_patching(simple_swagger_schema: dict) -> None:
     patcher = SpecPatcher()
     patched_once = patcher.patch(simple_swagger_schema)
     patched_twice = patcher.patch(patched_once)
-    
+
     json_once = json.dumps(patched_once, sort_keys=True)
     json_twice = json.dumps(patched_twice, sort_keys=True)
-    
+
     assert json_once == json_twice

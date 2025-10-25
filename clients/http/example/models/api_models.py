@@ -51,12 +51,8 @@ class ChangePassword(BaseModel):
     )
     login: Optional[str] = Field(None, description="User login")
     token: Optional[UUID] = Field(None, description="Password reset token")
-    old_password: Optional[str] = Field(
-        None, alias="oldPassword", description="Old password"
-    )
-    new_password: Optional[str] = Field(
-        None, alias="newPassword", description="New password"
-    )
+    old_password: Optional[str] = Field(None, alias="oldPassword", description="Old password")
+    new_password: Optional[str] = Field(None, alias="newPassword", description="New password")
 
 
 class ColorSchema(Enum):
@@ -95,9 +91,7 @@ class PagingSettings(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    posts_per_page: Optional[int] = Field(
-        None, alias="postsPerPage", description="Number of posts on a game room page"
-    )
+    posts_per_page: Optional[int] = Field(None, alias="postsPerPage", description="Number of posts on a game room page")
     comments_per_page: Optional[int] = Field(
         None,
         alias="commentsPerPage",
@@ -172,20 +166,14 @@ class User(BaseModel):
     )
     login: Optional[str] = Field(None, description="Login")
     roles: Optional[List[UserRole]] = Field(None, description="Roles")
-    medium_picture_url: Optional[str] = Field(
-        None, alias="mediumPictureUrl", description="Profile picture URL M-size"
-    )
-    small_picture_url: Optional[str] = Field(
-        None, alias="smallPictureUrl", description="Profile picture URL S-size"
-    )
+    medium_picture_url: Optional[str] = Field(None, alias="mediumPictureUrl", description="Profile picture URL M-size")
+    small_picture_url: Optional[str] = Field(None, alias="smallPictureUrl", description="Profile picture URL S-size")
     status: Optional[str] = Field(None, description="User defined status")
     rating: Optional[Rating] = None
     online: Optional[datetime] = Field(None, description="Last seen online moment")
     name: Optional[str] = Field(None, description="User real name")
     location: Optional[str] = Field(None, description="User real location")
-    registration: Optional[datetime] = Field(
-        None, description="User registration moment"
-    )
+    registration: Optional[datetime] = Field(None, description="User registration moment")
 
 
 class UserDetails(BaseModel):
@@ -194,20 +182,14 @@ class UserDetails(BaseModel):
     )
     login: Optional[str] = Field(None, description="Login")
     roles: Optional[List[UserRole]] = Field(None, description="Roles")
-    medium_picture_url: Optional[str] = Field(
-        None, alias="mediumPictureUrl", description="Profile picture URL M-size"
-    )
-    small_picture_url: Optional[str] = Field(
-        None, alias="smallPictureUrl", description="Profile picture URL S-size"
-    )
+    medium_picture_url: Optional[str] = Field(None, alias="mediumPictureUrl", description="Profile picture URL M-size")
+    small_picture_url: Optional[str] = Field(None, alias="smallPictureUrl", description="Profile picture URL S-size")
     status: Optional[str] = Field(None, description="User defined status")
     rating: Optional[Rating] = None
     online: Optional[datetime] = Field(None, description="Last seen online moment")
     name: Optional[str] = Field(None, description="User real name")
     location: Optional[str] = Field(None, description="User real location")
-    registration: Optional[datetime] = Field(
-        None, description="User registration moment"
-    )
+    registration: Optional[datetime] = Field(None, description="User registration moment")
     icq: Optional[str] = Field(None, description="User ICQ number")
     skype: Optional[str] = Field(None, description="User Skype login")
     original_picture_url: Optional[str] = Field(

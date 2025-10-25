@@ -62,9 +62,7 @@ class Logging:
 class Client(httpx.Client):
     def __init__(self, configuration: Configuration) -> None:
         self.configuration = configuration
-        super().__init__(
-            base_url=self.configuration.base_url, **self.configuration.kwargs
-        )
+        super().__init__(base_url=self.configuration.base_url, **self.configuration.kwargs)
         self._logger = Logging(self.configuration)
 
     def request(self, method: str, url: str, **kwargs: Any) -> httpx.Response:  # type: ignore
@@ -83,9 +81,7 @@ class Client(httpx.Client):
 class AsyncClient(httpx.AsyncClient):
     def __init__(self, configuration: Configuration) -> None:
         self.configuration = configuration
-        super().__init__(
-            base_url=self.configuration.base_url, **self.configuration.kwargs
-        )
+        super().__init__(base_url=self.configuration.base_url, **self.configuration.kwargs)
         self._logger = Logging(configuration)
 
     async def request(self, method: str, url: str, **kwargs: Any) -> httpx.Response:  # type: ignore

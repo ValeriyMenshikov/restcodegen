@@ -1,7 +1,4 @@
-import json
 import pytest
-from pathlib import Path
-from unittest.mock import patch, mock_open, MagicMock
 
 from restcodegen.generator.spec_loader import SpecLoader
 
@@ -31,9 +28,7 @@ def test_init() -> None:
 
 
 def test_open_from_url() -> None:
-    loader = SpecLoader(
-        "https://petstore3.swagger.io/api/v3/openapi.json", "test_service"
-    )
+    loader = SpecLoader("https://petstore3.swagger.io/api/v3/openapi.json", "test_service")
     assert isinstance(loader.open(), dict)
 
 

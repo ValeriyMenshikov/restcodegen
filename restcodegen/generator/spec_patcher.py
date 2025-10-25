@@ -37,9 +37,9 @@ class SpecPatcher:
     def _get_schemas_to_patch(self) -> list[str]:
         schemas_to_patch = []
 
-        schemas = self.swagger_scheme.get("components", {}).get(
-            "schemas", {}
-        ) or self.swagger_scheme.get("definitions", {})
+        schemas = self.swagger_scheme.get("components", {}).get("schemas", {}) or self.swagger_scheme.get(
+            "definitions", {}
+        )
         schemas_to_patch.extend([schema for schema in schemas if "." in schema])
 
         for _, methods in self.swagger_scheme.get("paths", {}).items():
@@ -71,9 +71,7 @@ class SpecPatcher:
     def _extract_inline_schemas_from_paths(self) -> None:
         for path, methods in self.swagger_scheme.get("paths", {}).items():
             for method_name, method in methods.items():
-                operation_id = method.get(
-                    "operationId", f"{method_name}_{path.replace('/', '_')}"
-                )
+                operation_id = method.get("operationId", f"{method_name}_{path.replace('/', '_')}")
                 self._process_request_body(method, operation_id)
                 self._process_responses(method, operation_id)
                 self._process_parameters(method, operation_id)
@@ -138,9 +136,7 @@ class SpecPatcher:
         self._process_object_properties(schema, schema_name)
         self._process_array_schema(schema, schema_name)
 
-    def _process_combined_schemas(
-        self, schema: dict[str, Any], schema_name: str
-    ) -> None:
+    def _process_combined_schemas(self, schema: dict[str, Any], schema_name: str) -> None:
         for combiner in ["allOf", "oneOf", "anyOf"]:
             if combiner not in schema:
                 continue
@@ -150,17 +146,11 @@ class SpecPatcher:
                     continue
 
                 sub_schema_name = f"{schema_name}_{combiner}_{i}"
-                self.swagger_scheme["components"]["schemas"][sub_schema_name] = (
-                    sub_schema
-                )
-                schema[combiner][i] = {
-                    "$ref": f"#/components/schemas/{sub_schema_name}"
-                }
+                self.swagger_scheme["components"]["schemas"][sub_schema_name] = sub_schema
+                schema[combiner][i] = {"$ref": f"#/components/schemas/{sub_schema_name}"}
                 self._process_schema(sub_schema, sub_schema_name)
 
-    def _process_object_properties(
-        self, schema: dict[str, Any], schema_name: str
-    ) -> None:
+    def _process_object_properties(self, schema: dict[str, Any], schema_name: str) -> None:
         if schema.get("type") != "object" or "properties" not in schema:
             return
 
@@ -170,12 +160,8 @@ class SpecPatcher:
 
             if prop_schema.get("type") == "object" and "properties" in prop_schema:
                 nested_schema_name = f"{schema_name}_{prop_name}"
-                self.swagger_scheme["components"]["schemas"][nested_schema_name] = (
-                    prop_schema
-                )
-                schema["properties"][prop_name] = {
-                    "$ref": f"#/components/schemas/{nested_schema_name}"
-                }
+                self.swagger_scheme["components"]["schemas"][nested_schema_name] = prop_schema
+                schema["properties"][prop_name] = {"$ref": f"#/components/schemas/{nested_schema_name}"}
                 self._process_schema(prop_schema, nested_schema_name)
             elif prop_schema.get("type") == "array" and "items" in prop_schema:
                 self._process_array_items(prop_schema, f"{schema_name}_{prop_name}")
@@ -184,23 +170,17 @@ class SpecPatcher:
         if schema.get("type") == "array" and "items" in schema:
             self._process_array_items(schema, schema_name)
 
-    def _process_array_items(
-        self, array_schema: dict[str, Any], schema_name: str
-    ) -> None:
+    def _process_array_items(self, array_schema: dict[str, Any], schema_name: str) -> None:
         items_schema = array_schema["items"]
         if "$ref" in items_schema:
             return
 
-        needs_extraction = (
-            items_schema.get("type") == "object" and "properties" in items_schema
-        ) or any(combiner in items_schema for combiner in ["allOf", "oneOf", "anyOf"])
+        needs_extraction = (items_schema.get("type") == "object" and "properties" in items_schema) or any(
+            combiner in items_schema for combiner in ["allOf", "oneOf", "anyOf"]
+        )
 
         if needs_extraction:
             items_schema_name = f"{schema_name}_item"
-            self.swagger_scheme["components"]["schemas"][items_schema_name] = (
-                items_schema
-            )
-            array_schema["items"] = {
-                "$ref": f"#/components/schemas/{items_schema_name}"
-            }
+            self.swagger_scheme["components"]["schemas"][items_schema_name] = items_schema
+            array_schema["items"] = {"$ref": f"#/components/schemas/{items_schema_name}"}
             self._process_schema(items_schema, items_schema_name)
