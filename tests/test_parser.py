@@ -1,3 +1,5 @@
+import json
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from restcodegen.generator.parser import Parser
@@ -100,3 +102,12 @@ def test_response_models(mock_spec_loader: MagicMock, sample_openapi_spec: dict)
     assert "User" in response_models
     assert "UserList" in response_models
     assert "PostList" in response_models
+
+
+def test_parser_with_remote_petstore_spec() -> None:
+    """Integration test against the public Petstore specification."""
+    parser = Parser("https://petstore3.swagger.io/api/v3/openapi.json", "petstore")
+    assert parser.service_name == "petstore"
+    assert parser.openapi_version.startswith("3.")
+    assert "pet" in parser.apis
+    assert parser.handlers_by_tag("pet")
