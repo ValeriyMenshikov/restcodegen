@@ -24,6 +24,7 @@ TYPE_MAP = {
     "array": "list",
     "anyof": "str",
     "none": "Any",
+    "object": "Any",
 }
 
 DEFAULT_HEADER_VALUE_MAP = {"int": 0, "float": 0.0, "str": "", "bool": True}
@@ -169,19 +170,19 @@ class Parser:
             return params
         for parameter in parameters:
             if parameter.get("in") == param_type:
-                parameter_type = parameter.get("schema", {})
-                any_of = parameter_type.get("anyOf")
-                enum = parameter_type.get("$ref")
+                parameter_schema = parameter.get("schema", {})
+                any_of = parameter_schema.get("anyOf")
+                enum_ref = parameter_schema.get("$ref")
 
-                parameter_type = parameter_type.get("type")
+                parameter_type = parameter_schema.get("type")
                 parameter_name = parameter.get("name")
                 parameter_description = parameter.get("description", "")
                 parameter_is_required = parameter.get("required", False)
 
                 if any_of:
                     parameter_type = "anyof"
-                if enum:
-                    parameter_type = enum.split("/")[-1]
+                if enum_ref:
+                    parameter_type = snake_to_camel(enum_ref.split("/")[-1])
 
                 # Пропускаем параметр, если имя не определено
                 if parameter_name is None:
@@ -189,7 +190,7 @@ class Parser:
 
                 parameter_with_desc = BaseParameter(
                     name=parameter_name,
-                    type_=parameter_type if enum else TYPE_MAP[str(parameter_type).lower()],
+                    type_=parameter_type if enum_ref else TYPE_MAP[str(parameter_type).lower()],
                     description=parameter_description,
                     required=parameter_is_required,
                     default=DEFAULT_HEADER_VALUE_MAP.get(TYPE_MAP.get(parameter_type, "")),

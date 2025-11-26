@@ -23,7 +23,7 @@ from {{ base_import }}.{{ service_name|to_snake_case }}.models.api_models import
 {% endif %}
 
 
-class {{ api_name|to_camel_case }}Api:
+class {{ api_name|to_snake_case|to_camel_case }}Api:
 
     def __init__(self, api_client: {% if async_mode %}AsyncClient{% else %}Client{% endif %}) -> None:
         self.api_client = api_client

@@ -16,13 +16,22 @@ def is_url(path: str) -> bool:
 
 
 def name_to_snake(string: str) -> str:
-    string = string.replace(" ", "_").replace("/", "_").replace(".", "_")
-    string = string.replace("{", "").replace("}", "")
+    translation_table = str.maketrans(
+        {
+            " ": "_",
+            "/": "_",
+            ".": "_",
+            "-": "_",
+            "{": None,
+            "}": None,
+            "[": None,
+            "]": None,
+            "&": "and",
+        }
+    )
     string = re.sub(r"([A-Z]+)([A-Z][a-z])", r"\1_\2", string)
     string = re.sub(r"([a-z\d])([A-Z])", r"\1_\2", string)
-    string = re.sub("&", "and", string)
-    string = string.replace("-", "_").lower().strip("_")
-    return string
+    return string.translate(translation_table).lower().strip("_")
 
 
 def snake_to_camel(string: str) -> str:

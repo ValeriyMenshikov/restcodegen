@@ -86,7 +86,7 @@ class RESTClientGenerator(BaseTemplateGenerator):
             output=file_path,
             snake_case_field=True,
             output_model_type=DataModelType.PydanticV2BaseModel,
-            reuse_model=True,
+            reuse_model=False,
             field_constraints=True,
             custom_file_header_path=header_path_template,
             capitalise_enum_members=True,
