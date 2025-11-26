@@ -6,7 +6,7 @@ from datamodel_code_generator import DataModelType, generate
 
 from restcodegen.generator.base import BaseTemplateGenerator
 from restcodegen.generator.log import LOGGER
-from restcodegen.generator.parser import Parser
+from restcodegen.generator.parser import Parser, Handler
 from restcodegen.generator.utils import (
     create_and_write_file,
     name_to_snake,
@@ -59,7 +59,7 @@ class RESTClientGenerator(BaseTemplateGenerator):
     def _gen_clients(self) -> None:
         for tag in self.openapi_spec.apis:
             LOGGER.info(f"Generate REST client for tag: {tag}")
-            handlers = self.openapi_spec.handlers_by_tag(tag)
+            handlers = [self._prepare_handler(handler) for handler in self.openapi_spec.handlers_by_tag(tag)]
             models = self.openapi_spec.models_by_tag(tag)
             rendered_code = self.env.get_template("api_client.jinja2").render(
                 async_mode=self.async_mode,
@@ -75,6 +75,17 @@ class RESTClientGenerator(BaseTemplateGenerator):
             create_and_write_file(file_path=file_path, text=rendered_code)
             create_and_write_file(file_path=file_path.parent / "__init__.py", text="# coding: utf-8")
 
+    @staticmethod
+    def _prepare_handler(handler: Handler) -> Handler:
+        for attribute in ("path_parameters", "query_parameters", "headers"):
+            params = handler.get(attribute)
+            if params:
+                sorted_params = sorted(params, key=lambda p: not p.required)
+                setattr(handler, attribute, sorted_params)
+            else:
+                setattr(handler, attribute, [])
+        return handler
+
     def _gen_models(self) -> None:
         LOGGER.info(f"Generate models for service: {self.openapi_spec.service_name}")
         file_path = self.base_path / name_to_snake(self.openapi_spec.service_name) / "models" / "api_models.py"
@@ -86,7 +97,7 @@ class RESTClientGenerator(BaseTemplateGenerator):
             output=file_path,
             snake_case_field=True,
             output_model_type=DataModelType.PydanticV2BaseModel,
-            reuse_model=True,
+            reuse_model=False,
             field_constraints=True,
             custom_file_header_path=header_path_template,
             capitalise_enum_members=True,

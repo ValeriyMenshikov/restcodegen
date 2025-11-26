@@ -1,10 +1,9 @@
 from __future__ import annotations
 
+import logging
 import sys
+from dataclasses import dataclass
 from enum import Enum
-
-import loguru
-from pydantic_settings import BaseSettings
 
 
 class LogLevelEnum(str, Enum):
@@ -15,32 +14,29 @@ class LogLevelEnum(str, Enum):
     DEBUG = "DEBUG"
 
 
-class LoggerSettings(BaseSettings):
-    log_json: bool = True
+@dataclass(slots=True)
+class LoggerSettings:
     log_level: LogLevelEnum = LogLevelEnum.DEBUG
 
 
-def build_root_logger(log_settings: LoggerSettings | None = None) -> loguru.Logger:
-    log_settings_ = log_settings or LoggerSettings()
-    loguru.logger.remove()
-    if log_settings_.log_json:
-        loguru.logger.add(
-            sys.stdout,
-            level=log_settings_.log_level.value,
-            backtrace=False,
-            diagnose=False,
-            serialize=False,
-        )
-    else:
-        loguru.logger.add(
-            sys.stdout,
-            level=log_settings_.log_level.value,
-        )
-    return loguru.logger
+def build_root_logger(log_settings: LoggerSettings | None = None) -> logging.Logger:
+    settings = log_settings or LoggerSettings()
+    logger = logging.getLogger("restcodegen")
+    logger.setLevel(settings.log_level.value)
+
+    if not logger.handlers:
+        handler = logging.StreamHandler(sys.stdout)
+        handler.setLevel(settings.log_level.value)
+        formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+        handler.setFormatter(formatter)
+        logger.addHandler(handler)
+
+    logger.propagate = False
+    return logger
 
 
 LOGGER = build_root_logger()
 
 
-def get_logger(name: str) -> loguru.Logger:
-    return loguru.logger.bind(logger_name=name)
+def get_logger(name: str) -> logging.Logger:
+    return logging.getLogger(name)

@@ -21,8 +21,6 @@ RestCodeGen is a powerful tool for automatically generating Python client librar
 - **Easy Client Generation**: Create Python clients with a single command
 - **Async Support**: Generate both synchronous and asynchronous clients
 - **Selective API Generation**: Choose specific API tags to include
-- **Built-in Logging**: Integrated with structlog for comprehensive request/response tracking
-- **Customizable**: Use your own HTTPX client for advanced configurations
 - **Type Hints**: All generated code includes proper type annotations
 
 ## 📦 Installation
@@ -122,31 +120,13 @@ After successful execution, a client library will be created with the following 
 The generated client includes built-in logging with `structlog` and supports custom HTTPX clients:
 
 ```python
-from restcodegen.restclient import Client, Configuration
+from httpx import Client
 from clients.http.petstore import PetApi
-import structlog
-
-# Configure logging
-structlog.configure(
-    processors=[
-        structlog.processors.JSONRenderer(
-            indent=4,
-            ensure_ascii=True,
-        )
-    ]
-)
 
 # Create and use the client
 if __name__ == '__main__':
-    # Configure the base URL
-    configuration = Configuration(host="https://petstore3.swagger.io/api/v3")
-    
-    # Use the built-in client
-    api_client = Client(configuration)
-    
-    # Or use your custom HTTPX client
-    # import httpx
-    # api_client = httpx.Client()  # or httpx.AsyncClient() for async mode
+    # Use the httpx client or httpx.AsyncClient() for async mode
+    api_client = Client(base_url="https://petstore3.swagger.io/api/v3")
     
     # Initialize the API
     pet_api = PetApi(api_client)

@@ -24,7 +24,7 @@ class SpecLoader:
 
     def _get_spec_by_url(self) -> dict | None:
         try:
-            response = httpx.get(self.spec_path, timeout=5)
+            response = httpx.get(self.spec_path, timeout=60, verify=False)
             response.raise_for_status()
         except httpx.HTTPError:
             spec = {}
