@@ -1,68 +1,15 @@
-import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 from restcodegen.generator.parser import Parser
-
-
-@pytest.fixture
-def sample_openapi_spec() -> dict:
-    return {
-        "openapi": "3.0.0",
-        "info": {"title": "Test API", "version": "1.0.0", "description": "API for testing"},
-        "paths": {
-            "/users": {
-                "get": {
-                    "operationId": "getUsers",
-                    "tags": ["users"],
-                    "summary": "Get users",
-                    "responses": {
-                        "200": {
-                            "description": "OK",
-                            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/UserList"}}},
-                        }
-                    },
-                },
-                "post": {
-                    "operationId": "createUser",
-                    "tags": ["users"],
-                    "summary": "Create user",
-                    "requestBody": {"content": {"application/json": {"schema": {"$ref": "#/components/schemas/User"}}}},
-                    "responses": {
-                        "201": {
-                            "description": "Created",
-                            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/User"}}},
-                        }
-                    },
-                },
-            },
-            "/posts": {
-                "get": {
-                    "operationId": "getPosts",
-                    "tags": ["posts"],
-                    "summary": "Get posts",
-                    "parameters": [{"name": "userId", "in": "query", "required": False, "schema": {"type": "integer"}}],
-                    "responses": {
-                        "200": {
-                            "description": "OK",
-                            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/PostList"}}},
-                        }
-                    },
-                }
-            },
-        },
-    }
 
 
 @patch("restcodegen.generator.spec_loader.SpecLoader.open")
 def test_parser_initialization(mock_spec_loader: MagicMock, sample_openapi_spec: dict) -> None:
     """Test Parser initialization and parsing."""
-    # Setup mock for spec loader
     mock_spec_loader.return_value = sample_openapi_spec
 
-    # Initialize parser
     parser = Parser("http://example.com/openapi.json", "test_service")
 
-    # Check basic properties
     assert parser.service_name == "test_service"
     assert parser.client_type == "http"
     assert len(parser.all_tags) > 0

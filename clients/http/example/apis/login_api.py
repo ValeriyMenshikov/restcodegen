@@ -78,9 +78,7 @@ class LoginApi:
         if headers_from_kwargs:
             headers.update(headers_from_kwargs)
 
-        content = login_credentials.model_dump_json(
-            exclude_none=True, by_alias=True
-        )  # noqa: E501
+        content = login_credentials.model_dump_json(exclude_none=True, by_alias=True)  # noqa: E501
         headers.update({"Content-Type": "application/json"})
 
         response = self.api_client.post(

@@ -9,9 +9,9 @@
 from httpx import Response
 from typing import Any
 {% if async_mode %}
-from restcodegen.restclient import AsyncClient
+from httpx import AsyncClient
 {% else %}
-from restcodegen.restclient import Client
+from httpx import Client
 {% endif %}
 {% if models %}
 from {{ base_import }}.{{ service_name|to_snake_case }}.models.api_models import (

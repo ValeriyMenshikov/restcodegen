@@ -97,9 +97,7 @@ class AccountApi:
         if headers_from_kwargs:
             headers.update(headers_from_kwargs)
 
-        content = Registration.model_dump_json(
-            exclude_none=True, by_alias=True
-        )  # noqa: E501
+        content = Registration.model_dump_json(exclude_none=True, by_alias=True)  # noqa: E501
         headers.update({"Content-Type": "application/json"})
 
         response = self.api_client.post(
@@ -329,9 +327,7 @@ class AccountApi:
         if headers_from_kwargs:
             headers.update(headers_from_kwargs)
 
-        content = reset_password.model_dump_json(
-            exclude_none=True, by_alias=True
-        )  # noqa: E501
+        content = reset_password.model_dump_json(exclude_none=True, by_alias=True)  # noqa: E501
         headers.update({"Content-Type": "application/json"})
 
         response = self.api_client.post(
@@ -412,9 +408,7 @@ class AccountApi:
         if headers_from_kwargs:
             headers.update(headers_from_kwargs)
 
-        content = change_password.model_dump_json(
-            exclude_none=True, by_alias=True
-        )  # noqa: E501
+        content = change_password.model_dump_json(exclude_none=True, by_alias=True)  # noqa: E501
         headers.update({"Content-Type": "application/json"})
 
         response = self.api_client.put(
@@ -495,9 +489,7 @@ class AccountApi:
         if headers_from_kwargs:
             headers.update(headers_from_kwargs)
 
-        content = change_email.model_dump_json(
-            exclude_none=True, by_alias=True
-        )  # noqa: E501
+        content = change_email.model_dump_json(exclude_none=True, by_alias=True)  # noqa: E501
         headers.update({"Content-Type": "application/json"})
 
         response = self.api_client.put(
