@@ -1,23 +1,31 @@
 from __future__ import annotations
 
+import json
+import tempfile
+from dataclasses import dataclass
 import re
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Dict, List, Tuple
+
+from datamodel_code_generator import OpenAPIScope, PythonVersion
+from datamodel_code_generator.parser.openapi import (
+    OpenAPIParser,
+    Operation,
+    ParameterObject,
+    ReferenceObject,
+    RequestBodyObject,
+    ResponseObject,
+)
 
 from restcodegen.generator.log import LOGGER
-from restcodegen.generator.parser.types import (
-    BaseParameter,
-    ParameterType,
-    Handler,
-)
-from restcodegen.generator.utils import (
-    name_to_snake,
-    rename_python_builtins,
-    snake_to_camel,
-)
+from restcodegen.generator.parser.types import BaseParameter, Handler, ParameterType
+from restcodegen.generator.utils import name_to_snake, rename_python_builtins, snake_to_camel
 
 if TYPE_CHECKING:
     from restcodegen.generator.spec.loader import SpecLoader
+
+
+OPERATION_NAMES: set[str] = {"get", "put", "post", "delete", "patch", "head", "options", "trace"}
 
 TYPE_MAP = {
     "integer": "int",
@@ -25,12 +33,21 @@ TYPE_MAP = {
     "string": "str",
     "boolean": "bool",
     "array": "list",
-    "anyof": "str",
-    "none": "Any",
     "object": "Any",
 }
 
 DEFAULT_HEADER_VALUE_MAP = {"int": 0, "float": 0.0, "str": "", "bool": True}
+
+
+@dataclass(slots=True)
+class ParsedOperation:
+    path: str
+    method: str
+    operation: Operation
+    parameters: list[ParameterObject]
+    request_body: RequestBodyObject | None
+    responses: dict[str, ResponseObject]
+    raw_operation: dict[str, Any]
 
 
 class Parser:
@@ -43,6 +60,7 @@ class Parser:
         selected_tags: list[str] | None = None,
     ) -> None:
         self.openapi_spec = openapi_spec
+        self._raw_spec = openapi_spec
         self._service_name = service_name
         self.version: str = ""
         self.description: str = ""
@@ -50,6 +68,9 @@ class Parser:
         self.handlers: list[Handler] = []
         self._selected_tags: set[str] = set(selected_tags) if selected_tags else set()
         self.all_tags: set[str] = set()
+        self.request_model_names: set[str] = set()
+        self.response_model_names: set[str] = set()
+        self._operations: list[ParsedOperation] | None = None
         self.parse()
 
     @classmethod
@@ -61,7 +82,7 @@ class Parser:
         selected_tags: list[str] | None = None,
         loader: SpecLoader | None = None,
     ) -> "Parser":
-        from restcodegen.generator.spec.loader import SpecLoader  # локальный импорт во избежание циклов
+        from restcodegen.generator.spec.loader import SpecLoader
 
         spec_loader = loader or SpecLoader(openapi_spec, package_name)
         spec = spec_loader.open()
@@ -69,17 +90,12 @@ class Parser:
 
     @property
     def apis(self) -> set[str]:
-        result_tags = set()
-        for tag in self._selected_tags:
-            if tag not in self.all_tags:
-                LOGGER.warning(f"Tag {tag} not found in openapi spec")
-            else:
-                result_tags.add(tag)
-
-        if not result_tags and self._selected_tags:
-            LOGGER.warning("Tags not found in openapi spec, used default tags")
+        if not self._selected_tags:
             return self.all_tags
-        elif not result_tags and not self._selected_tags:
+
+        result_tags = {tag for tag in self._selected_tags if tag in self.all_tags}
+        if not result_tags:
+            LOGGER.warning("Ни один из выбранных тегов не найден в спецификации. Будут использованы все доступные теги.")
             return self.all_tags
 
         return result_tags
@@ -87,136 +103,6 @@ class Parser:
     @property
     def service_name(self) -> str:
         return self._service_name
-
-    @staticmethod
-    def _get_request_body(request_body: dict | list) -> str | None:
-        if isinstance(request_body, list):
-            for parameter in request_body:
-                if parameter.get("in") == "body":
-                    schema = parameter.get("schema", {}).get("$ref", None)
-                    if schema:
-                        model_path = snake_to_camel(schema.split("/")[-1])
-                        model_name = model_path[0].upper() + model_path[1:]
-                        return model_name
-        else:
-            for content_type in request_body.get("content", {}).keys():
-                schema = request_body.get("content", {}).get(content_type, {}).get("schema", {}).get("$ref", None)
-                if schema:
-                    model_name = snake_to_camel(schema.split("/")[-1])
-                    return model_name
-        return None
-
-    def _get_response_body(self, response_body: dict) -> dict:
-        responses: dict = {}
-        if response_body:
-            if self.openapi_version.startswith("3."):
-                for status_code in response_body:
-                    for content_type in response_body.get(status_code, {}).get("content", {}).keys():
-                        schema = (
-                            response_body.get(status_code, {})
-                            .get("content", {})
-                            .get(content_type, {})
-                            .get("schema", {})
-                            .get("$ref", None)
-                        )
-                        model_name = schema.split("/")[-1] if schema else None
-                        if model_name:
-                            model_name = snake_to_camel(model_name)
-                            responses[status_code] = model_name
-            elif self.openapi_version.startswith("2."):
-                for status_code, response in response_body.items():
-                    ref_schema = response.get("schema", {}).get("$ref")
-                    result_schema = response.get("schema", {}).get("result")
-                    schema = ref_schema or result_schema
-                    if schema:
-                        model = snake_to_camel(schema.split("/")[-1])
-                        responses[status_code] = model
-                        model_name = model[0].upper() + model[1:]
-                        responses[status_code] = model_name
-        return responses
-
-    def _get_headers(self, parameters: list[dict]) -> list[BaseParameter]:
-        params = self._get_params_with_types(parameters, param_type=ParameterType.HEADER)
-        return params
-
-    def _get_path_parameters(self, parameters: list[dict]) -> list[BaseParameter]:
-        params = self._get_params_with_types(parameters, param_type=ParameterType.PATH)
-        return params
-
-    def _get_query_parameters(self, parameters: list[dict]) -> list[BaseParameter]:
-        params = self._get_params_with_types(parameters, param_type=ParameterType.QUERY)
-        return params
-
-    @staticmethod
-    def _get_params_with_types(parameters: list[dict], param_type: ParameterType) -> list[BaseParameter]:
-        params: list[BaseParameter] = []
-        if not parameters:
-            return params
-        for parameter in parameters:
-            if parameter.get("in") == param_type:
-                parameter_schema = parameter.get("schema", {})
-                any_of = parameter_schema.get("anyOf")
-                enum_ref = parameter_schema.get("$ref")
-
-                parameter_type = parameter_schema.get("type")
-                parameter_name = parameter.get("name")
-                parameter_description = parameter.get("description", "")
-                parameter_is_required = parameter.get("required", False)
-
-                if any_of:
-                    parameter_type = "anyof"
-                if enum_ref:
-                    parameter_type = snake_to_camel(enum_ref.split("/")[-1])
-
-                # Пропускаем параметр, если имя не определено
-                if parameter_name is None:
-                    continue
-
-                parameter_with_desc = BaseParameter(
-                    name=parameter_name,
-                    type_=parameter_type if enum_ref else TYPE_MAP[str(parameter_type).lower()],
-                    description=parameter_description,
-                    required=parameter_is_required,
-                    default=DEFAULT_HEADER_VALUE_MAP.get(TYPE_MAP.get(parameter_type, "")),
-                )
-
-                params.append(parameter_with_desc)
-
-        return params
-
-    @staticmethod
-    def _normalize_swagger_path(path: str, fix_builtins: bool = True) -> str:
-        def replace_placeholder(match: re.Match) -> str:
-            placeholder = match.group(0)[1:-1]
-            if not placeholder:
-                return ""
-
-            return (
-                f"{{{rename_python_builtins(name_to_snake(placeholder))}}}"
-                if fix_builtins
-                else f"{{{name_to_snake(placeholder)}}}"
-            )
-
-        normalized_path = re.sub(r"\{[^}]*\}", replace_placeholder, path)
-        return normalized_path
-
-    @staticmethod
-    def _extract_path_params_from_url(path: str) -> list[BaseParameter]:
-        params = []
-        path_params = re.findall(r"\{([^}]+)\}", path)
-
-        for param in path_params:
-            param_name = name_to_snake(param)
-            params.append(
-                BaseParameter(
-                    name=param_name,
-                    type_="str",
-                    description=f"Path parameter: {param_name}",
-                    required=True,
-                )
-            )
-
-        return params
 
     def parse(self) -> list[Handler]:
         info = self.openapi_spec.get("info", {})
@@ -226,86 +112,24 @@ class Parser:
 
         if self.openapi_version.startswith("2."):
             LOGGER.warning(
-                "OpenAPI/Swagger version 2.0 is not supported. "
-                "You may convert it to 3.0 with https://converter.swagger.io/ "
-                "and set the local spec path in 'swagger' option in nuke.toml!"
+                "OpenAPI/Swagger version 2.0 требует конвертации в 3.x. "
+                "Пожалуйста, обновите спецификацию перед генерацией."
             )
 
-        paths = self.openapi_spec.get("paths", {})
-        for path, methods in paths.items():
-            for method, details in methods.items():
-                self._process_method(path, method, details)
+        parser = self._init_openapi_parser()
+        operations = self._collect_operations(parser)
+        handlers, tags, request_models, response_models = self._build_handlers(operations)
+
+        self._operations = operations
+        self.handlers = handlers
+        self.all_tags = tags
+        self.request_model_names = request_models
+        self.response_model_names = response_models
         return self.handlers
 
-    def _process_method(self, path: str, method: str, details: dict) -> None:
-        tags = details.get("tags", [])
-        for tag in tags:
-            self.all_tags.add(tag)
-
-        summary = details.get("summary", "")
-        operation_id = details.get("operationId", "")
-        parameters = details.get("parameters", [])
-        query_parameters = self._get_query_parameters(parameters)
-        path_parameters = self._get_path_parameters(parameters)
-        headers = self._get_headers(parameters)
-        request_body = self._get_request_body(details.get("requestBody", details.get("parameters", {})))
-        responses = self._get_response_body(details.get("responses", {}))
-
-        if not path_parameters:
-            path_parameters = self._extract_path_params_from_url(path)
-
-        path_obj = Handler(
-            path=self._normalize_swagger_path(path),
-            method=method,
-            tags=tags,
-            summary=summary,
-            operation_id=operation_id,
-            query_parameters=query_parameters,
-            headers=headers,
-            path_parameters=path_parameters,
-            request_body=request_body,
-            responses=responses,
-        )
-        self.handlers.append(path_obj)
-
-    def request_models(self) -> set[str]:
-        models: set[str] = set()
-        for handler in self.handlers:
-            if handler.request_body is not None:
-                models.add(handler.request_body)
-        return models
-
-    def response_models(self) -> set[str]:
-        models: set[str] = set()
-        for handler in self.handlers:
-            if handler.responses is not None:
-                models.update(handler.responses.values())
-        return models
-
-    def models_by_tag(self, tag: str) -> set[str]:
-        models: set[str] = set()
-        for handler in self.handlers:
-            if tag in handler.tags:
-                if handler.path_parameters is not None:
-                    for param in handler.path_parameters:
-                        param_type = param.type
-                        if param_type not in TYPE_MAP.values():
-                            models.add(param_type)
-                if handler.query_parameters is not None:
-                    for query_param in handler.query_parameters:
-                        query_param_type = query_param.type
-                        if query_param_type not in TYPE_MAP.values():
-                            models.add(query_param_type)
-                if handler.headers is not None:
-                    for header_param in handler.headers:
-                        header_param_type = header_param.type
-                        if header_param_type not in TYPE_MAP.values():
-                            models.add(header_param_type)
-                if handler.request_body is not None:
-                    models.add(handler.request_body)
-                if handler.responses is not None:
-                    models.update(handler.responses.values())
-        return models
+    @property
+    def operations(self) -> list[ParsedOperation]:
+        return list(self._operations or [])
 
     def handlers_by_tag(self, tag: str) -> list[Handler]:
         return [h for h in self.handlers if tag in h.tags]
@@ -315,3 +139,230 @@ class Parser:
 
     def handler_by_path(self, path: str) -> list[Handler]:
         return [h for h in self.handlers if h.path == path]
+
+    def request_models(self) -> set[str]:
+        return set(self.request_model_names)
+
+    def response_models(self) -> set[str]:
+        return set(self.response_model_names)
+
+    def models_by_tag(self, tag: str) -> set[str]:
+        models: set[str] = set()
+        for handler in self.handlers:
+            if tag in handler.tags:
+                if handler.request_body:
+                    models.add(handler.request_body)
+                if handler.responses:
+                    models.update(handler.responses.values())
+                for param_group in (handler.path_parameters, handler.query_parameters, handler.headers):
+                    if not param_group:
+                        continue
+                    for param in param_group:
+                        models.add(param.type)
+        return models
+
+    def _init_openapi_parser(self) -> OpenAPIParser:
+        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as tmp_file:
+            json.dump(self._raw_spec, tmp_file)
+            tmp_path = Path(tmp_file.name)
+
+        try:
+            parser = OpenAPIParser(
+                tmp_path,
+                target_python_version=PythonVersion.PY_310,
+                openapi_scopes=[OpenAPIScope.Schemas, OpenAPIScope.Paths],
+                include_path_parameters=True,
+            )
+            parser.parse()
+        finally:
+            tmp_path.unlink(missing_ok=True)
+
+        return parser
+
+    def _collect_operations(self, parser: OpenAPIParser) -> list[ParsedOperation]:
+        operations: list[ParsedOperation] = []
+        raw_paths: Dict[str, Dict[str, Any]] = parser.raw_obj.get("paths", {})  # type: ignore[assignment]
+        for path, methods in raw_paths.items():
+            if not isinstance(methods, dict):
+                continue
+
+            for method, raw_operation in methods.items():
+                if method not in OPERATION_NAMES:
+                    continue
+
+                operation = Operation.model_validate(raw_operation)
+                resolved_parameters: list[ParameterObject] = []
+                for parameter in operation.parameters:
+                    if isinstance(parameter, ReferenceObject):
+                        resolved_param = parser.get_ref_model(parameter.ref)
+                        resolved_parameters.append(ParameterObject.model_validate(resolved_param))
+                    else:
+                        resolved_parameters.append(parameter)
+
+                request_body: RequestBodyObject | None = None
+                if operation.requestBody is not None:
+                    if isinstance(operation.requestBody, ReferenceObject):
+                        ref_body = parser.get_ref_model(operation.requestBody.ref)
+                        request_body = RequestBodyObject.model_validate(ref_body)
+                    else:
+                        request_body = operation.requestBody
+
+                resolved_responses: dict[str, ResponseObject] = {}
+                for status_code, response in operation.responses.items():
+                    if isinstance(response, ReferenceObject):
+                        ref_response = parser.get_ref_model(response.ref)
+                        resolved_responses[str(status_code)] = ResponseObject.model_validate(ref_response)
+                    else:
+                        resolved_responses[str(status_code)] = response
+
+                operations.append(
+                    ParsedOperation(
+                        path=path,
+                        method=method,
+                        operation=operation,
+                        parameters=resolved_parameters,
+                        request_body=request_body,
+                        responses=resolved_responses,
+                        raw_operation=raw_operation,
+                    )
+                )
+
+        return operations
+
+    def _build_handlers(self, operations: list[ParsedOperation]) -> tuple[list[Handler], set[str], set[str], set[str]]:
+        handlers: list[Handler] = []
+        tags: set[str] = set()
+        request_models: set[str] = set()
+        response_models: set[str] = set()
+
+        for operation in operations:
+            tags.update(operation.operation.tags or [])
+            request_body_model = self._extract_request_body_model(operation)
+            if request_body_model:
+                request_models.add(request_body_model)
+
+            responses = self._extract_response_models(operation.responses)
+            response_models.update(responses.values())
+
+            path_params, query_params, header_params = self._split_parameters(operation.parameters)
+            if not path_params:
+                path_params = self._extract_path_params_from_path(operation.path)
+
+            handler = Handler(
+                path=self._normalize_path(operation.path),
+                method=operation.method,
+                tags=operation.operation.tags or [],
+                summary=operation.operation.summary,
+                operation_id=operation.operation.operationId,
+                path_parameters=path_params,
+                query_parameters=query_params,
+                headers=header_params,
+                request_body=request_body_model,
+                responses=responses,
+            )
+            handlers.append(handler)
+
+        return handlers, tags, request_models, response_models
+
+    @staticmethod
+    def _normalize_path(path: str) -> str:
+        def replace_placeholder(match: re.Match[str]) -> str:
+            placeholder = match.group(0)[1:-1]
+            if not placeholder:
+                return ""
+            return "{" + rename_python_builtins(name_to_snake(placeholder)) + "}"
+
+        return re.sub(r"\{[^}]*\}", replace_placeholder, path)
+
+    @staticmethod
+    def _extract_parameter_type(parameter: ParameterObject) -> str:
+        schema = parameter.schema_
+        if schema and schema.type:
+            schema_type = schema.type.value if hasattr(schema.type, "value") else schema.type
+            if isinstance(schema_type, list):
+                schema_type = schema_type[0]
+            mapped = TYPE_MAP.get(str(schema_type).lower())
+            if mapped:
+                return mapped
+            return str(schema_type)
+        return "str"
+
+    @classmethod
+    def _build_parameter(cls, parameter: ParameterObject) -> BaseParameter:
+        in_location = ParameterType(parameter.in_.value if parameter.in_ else ParameterType.QUERY.value)
+        type_str = cls._extract_parameter_type(parameter)
+        default = DEFAULT_HEADER_VALUE_MAP.get(type_str)
+        if parameter.schema_ and parameter.schema_.default is not None:
+            default = parameter.schema_.default
+        return BaseParameter(
+            name=parameter.name or "param",
+            type_=type_str,
+            description=parameter.description or "",
+            required=parameter.required,
+            default=default if in_location == ParameterType.HEADER else None,
+        )
+
+    @staticmethod
+    def _extract_request_body_model(operation: ParsedOperation) -> str | None:
+        if not operation.request_body:
+            return None
+        for media in operation.request_body.content.values():
+            schema = media.schema_
+            if isinstance(schema, ReferenceObject):
+                return Parser._ref_to_model_name(schema.ref)
+            if schema and schema.ref:
+                return Parser._ref_to_model_name(schema.ref)
+        return None
+
+    @staticmethod
+    def _ref_to_model_name(ref: str) -> str:
+        name = ref.split("/")[-1]
+        return snake_to_camel(name)
+
+    @staticmethod
+    def _extract_response_models(responses: dict[str, ResponseObject]) -> dict[str, str]:
+        result: dict[str, str] = {}
+        for status_code, response in responses.items():
+            for media in response.content.values():
+                schema = media.schema_
+                if isinstance(schema, ReferenceObject):
+                    result[status_code] = Parser._ref_to_model_name(schema.ref)
+                elif schema and schema.ref:
+                    result[status_code] = Parser._ref_to_model_name(schema.ref)
+        return result
+
+    @staticmethod
+    def _extract_path_params_from_path(path: str) -> list[BaseParameter]:
+        params: list[BaseParameter] = []
+        for match in re.findall(r"\{([^}]+)\}", path):
+            normalized_name = rename_python_builtins(name_to_snake(match))
+            params.append(
+                BaseParameter(
+                    name=normalized_name,
+                    type_="str",
+                    description=f"Path parameter: {normalized_name}",
+                    required=True,
+                )
+            )
+        return params
+
+    @classmethod
+    def _split_parameters(cls, parameters: list[ParameterObject]) -> Tuple[list[BaseParameter], list[BaseParameter], list[BaseParameter]]:
+        path_params: list[BaseParameter] = []
+        query_params: list[BaseParameter] = []
+        header_params: list[BaseParameter] = []
+
+        for parameter in parameters:
+            built = cls._build_parameter(parameter)
+            location = parameter.in_.value if parameter.in_ else "query"
+            if location == ParameterType.PATH.value:
+                path_params.append(built)
+            elif location == ParameterType.HEADER.value:
+                header_params.append(built)
+            else:
+                query_params.append(built)
+
+        def sort_params(items: list[BaseParameter]) -> list[BaseParameter]:
+            return sorted(items, key=lambda param: not param.required)
+
+        return sort_params(path_params), sort_params(query_params), sort_params(header_params)
