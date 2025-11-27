@@ -9,7 +9,7 @@ def test_parser_initialization(sample_openapi_spec: dict) -> None:
     parser = Parser(sample_openapi_spec, "test_service")
 
     assert parser.service_name == "test_service"
-    assert len(parser.all_tags) > 0
+    assert len(parser.operations) > 0
     assert "users" in parser.all_tags
     assert "posts" in parser.all_tags
 
@@ -42,13 +42,13 @@ def test_handlers_by_tag(sample_openapi_spec: dict) -> None:
     # Check handlers for users tag
     users_handlers = parser.handlers_by_tag("users")
     assert len(users_handlers) == 2
-    assert any(h.operation_id == "getUsers" for h in users_handlers)
-    assert any(h.operation_id == "createUser" for h in users_handlers)
+    assert any(h.operation.operationId == "getUsers" for h in users_handlers)
+    assert any(h.operation.operationId == "createUser" for h in users_handlers)
 
     # Check handlers for posts tag
     posts_handlers = parser.handlers_by_tag("posts")
     assert len(posts_handlers) == 1
-    assert posts_handlers[0].operation_id == "getPosts"
+    assert posts_handlers[0].operation.operationId == "getPosts"
 
     # Check handlers for non-existent tag
     nonexistent_handlers = parser.handlers_by_tag("nonexistent")

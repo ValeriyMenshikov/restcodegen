@@ -32,7 +32,11 @@ class ComponentSchemaPatcher:
         schemas = spec.get("components", {}).get("schemas", {}) or spec.get("definitions", {})
         names = [name for name in schemas if "." in name]
         for path_item in spec.get("paths", {}).values():
+            if not isinstance(path_item, dict):
+                continue
             for operation in path_item.values():
+                if not isinstance(operation, dict):
+                    continue
                 for tag in operation.get("tags", []):
                     if "." in tag:
                         names.append(tag)
@@ -41,7 +45,11 @@ class ComponentSchemaPatcher:
     @staticmethod
     def _clean_tags(spec: dict[str, Any]) -> None:
         for path_item in spec.get("paths", {}).values():
+            if not isinstance(path_item, dict):
+                continue
             for operation in path_item.values():
+                if not isinstance(operation, dict):
+                    continue
                 tags = operation.get("tags")
                 if tags:
                     operation["tags"] = [tag.replace(".", "") for tag in tags]

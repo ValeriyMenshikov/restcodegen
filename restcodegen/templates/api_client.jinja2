@@ -27,17 +27,18 @@ class {{ api_name|to_snake_case|to_camel_case }}Api:
     def __init__(self, api_client: {% if async_mode %}AsyncClient{% else %}Client{% endif %}) -> None:
         self.api_client = api_client
 
-    {%- for data in data_list %}
-    {%- set method = data.get('method') %}
-    {%- set path = data.get('path', None) %}
-    {%- set request_body = data.get('request_body') %}
-    {%- set summary = data.get('summary') %}
-    {%- set responses = data.get('responses') %}
-    {%- set success_response = responses.get('200', None) or responses.get('201', None) %}
-    {%- set query_parameters = data.get('query_parameters', []) %}
-    {%- set path_parameters = data.get('path_parameters', []) %}
-    {%- set headers = data.get('headers', []) %}
-    {%- set param_groups = [path_parameters, query_parameters, headers] %}
+    {%- for op in operations %}
+{%- set method = op.method %}
+{%- set path = op.path %}
+{%- set raw_path = op.raw_path %}
+{%- set summary = op.summary %}
+{%- set responses = op.responses %}
+{%- set success_response = op.success_response %}
+{%- set request_body = op.request_body_model %}
+{%- set parameters = op.parameters %}
+{%- set path_parameters = parameters.get('path', []) %}
+{%- set query_parameters = parameters.get('query', []) %}
+{%- set headers = parameters.get('header', []) %}
 
     {% if async_mode %}async {% endif %}def {{ method }}_{{ path|to_snake_case }}(
         self,
@@ -45,10 +46,10 @@ class {{ api_name|to_snake_case|to_camel_case }}Api:
         {{ request_body|to_snake_case }}: {{ request_body }}, # noqa: E501
         {%- endif %}
         {%- for param in path_parameters + query_parameters + headers if param.get('required') %}
-        {{ param.get('name')|to_snake_case|rename_python_builtins }}: {{ param.get('type') }},
+        {{ param.get('python_name') }}: {{ param.get('type') }},
         {%- endfor %}
         {%- for param in path_parameters + query_parameters + headers if not param.get('required') %}
-        {{ param.get('name')|to_snake_case|rename_python_builtins }}: {{ param.get('type') }} | None = None,
+        {{ param.get('python_name') }}: {{ param.get('type') }} | None = None,
         {%- endfor %}
         **kwargs: Any,
     ) -> {{ success_response if success_response else 'Response' }}:
@@ -60,10 +61,10 @@ class {{ api_name|to_snake_case|to_camel_case }}Api:
             {{ request_body|to_snake_case }}({{ request_body }}): ...
             {%- endif %}
             {%- for param in path_parameters + query_parameters + headers if param.get('required') %}
-            {{ param.get('name')|to_snake_case|rename_python_builtins }}({{ param.get('type')}}{% if param.get('required')%}, required{% else %}, optional{% endif %}): {{ param.get('description', '') | wordwrap(width=50) if param.get('description') else '...' }}
+            {{ param.get('python_name') }}({{ param.get('type')}}{% if param.get('required')%}, required{% else %}, optional{% endif %}): {{ param.get('description', '') | wordwrap(width=50) if param.get('description') else '...' }}
             {%- endfor %}
             {%- for param in path_parameters + query_parameters + headers if not param.get('required') %}
-            {{ param.get('name')|to_snake_case|rename_python_builtins }}({{ param.get('type')}} | None{% if param.get('required')%}, required{% else %}, optional{% endif %}): {{ param.get('description', '') | wordwrap(width=50) if param.get('description') else '...' }}
+            {{ param.get('python_name') }}({{ param.get('type')}} | None{% if param.get('required')%}, required{% else %}, optional{% endif %}): {{ param.get('description', '') | wordwrap(width=50) if param.get('description') else '...' }}
             {%- endfor %}
             **kwargs: Arguments supported by the httpx library (data, files, headers, etc.)
 
@@ -74,7 +75,7 @@ class {{ api_name|to_snake_case|to_camel_case }}Api:
         response = {%- if async_mode %}await {% endif %}self.{{ method }}_{{ path|to_snake_case }}_with_http_info(
             {%- if path_parameters %}
             {%- for path_param in path_parameters %}
-            {{ path_param.get('name')|to_snake_case|rename_python_builtins }}={{ path_param.get('name')|to_snake_case|rename_python_builtins }},
+            {{ path_param.get('python_name') }}={{ path_param.get('python_name') }},
             {%- endfor %}
             {%- endif %}
             {%- if request_body %}
@@ -82,12 +83,12 @@ class {{ api_name|to_snake_case|to_camel_case }}Api:
             {%- endif %}
             {%- if query_parameters %}
             {%- for query_param in query_parameters %}
-            {{ query_param.get('name')|to_snake_case|rename_python_builtins }}={{ query_param.get('name')|to_snake_case|rename_python_builtins }},
+            {{ query_param.get('python_name') }}={{ query_param.get('python_name') }},
             {%- endfor %}
             {%- endif %}
             {%- if headers %}
             {%- for header in headers %}
-            {{ header.get('name')|to_snake_case|rename_python_builtins }}={{ header.get('name')|to_snake_case|rename_python_builtins }},
+            {{ header.get('python_name') }}={{ header.get('python_name') }},
             {%- endfor %}
             {%- endif %}
             **kwargs,
@@ -106,17 +107,17 @@ class {{ api_name|to_snake_case|to_camel_case }}Api:
         {%- endif %}
         {%- if path_parameters %}
         {%- for path_param in path_parameters %}
-        {{ path_param.get('name')|to_snake_case|rename_python_builtins }}: {{ path_param.get('type') }}{% if not path_param.get('required') %} | None{% endif %}{% if not path_param.get('required') %} = None{% endif %},
+        {{ path_param.get('python_name') }}: {{ path_param.get('type') }}{% if not path_param.get('required') %} | None{% endif %}{% if not path_param.get('required') %} = None{% endif %},
         {%- endfor %}
         {%- endif %}
         {%- if query_parameters %}
         {%- for query_param in query_parameters %}
-        {{ query_param.get('name')|to_snake_case|rename_python_builtins }}: {{ query_param.get('type') }}{% if not query_param.get('required') %} | None{% endif %}{% if not query_param.get('required') %} = None{% endif %},
+        {{ query_param.get('python_name') }}: {{ query_param.get('type') }}{% if not query_param.get('required') %} | None{% endif %}{% if not query_param.get('required') %} = None{% endif %},
         {%- endfor %}
         {%- endif %}
         {%- if headers %}
         {%- for header in headers %}
-        {{ header.get('name')|to_snake_case|rename_python_builtins }}: {{ header.get('type') }}{% if not header.get('required') %} | None{% endif %}{% if header.get('required') %}{% else %} = None{% endif %},
+        {{ header.get('python_name') }}: {{ header.get('type') }}{% if not header.get('required') %} | None{% endif %}{% if header.get('required') %}{% else %} = None{% endif %},
         {%- endfor %}
         {%- endif %}
         **kwargs: Any,
@@ -129,7 +130,7 @@ class {{ api_name|to_snake_case|to_camel_case }}Api:
             {{ request_body|to_snake_case }}({{ request_body }}): ...
             {%- endif %}
             {%- for param in path_parameters + query_parameters + headers %}
-            {{ param.get('name')|to_snake_case|rename_python_builtins }}({{ param.get('type')}}{% if param.get('required')%}, required{% else %}, optional{% endif %}): {{ param.get('description', '') | wordwrap(width=50) if param.get('description') else '...' }}
+            {{ param.get('python_name') }}({{ param.get('type')}}{% if param.get('required')%}, required{% else %}, optional{% endif %}): {{ param.get('description', '') | wordwrap(width=50) if param.get('description') else '...' }}
             {%- endfor %}
             **kwargs: Arguments supported by the httpx library (data, files, headers, etc.)
 
@@ -140,7 +141,7 @@ class {{ api_name|to_snake_case|to_camel_case }}Api:
         # process the query parameters
         params_map = {
             {%- for query_param in query_parameters %}
-            "{{ query_param.get('name') }}": {{ query_param.get('name')|to_snake_case|rename_python_builtins }},
+            "{{ query_param.get('name') }}": {{ query_param.get('python_name') }},
             {%- endfor %}
         }
         params = {k: v for k, v in params_map.items() if v}
@@ -149,7 +150,7 @@ class {{ api_name|to_snake_case|to_camel_case }}Api:
         # process the header parameters
         headers_map = {
             {%- for header in headers %}
-            "{{ header.get('name') }}": str({{ header.get('name')|to_snake_case|rename_python_builtins }}),
+            "{{ header.get('name') }}": str({{ header.get('python_name') }}),
             {%- endfor %}
         }
         headers = {k: str(v) for k, v in headers_map.items() if v}

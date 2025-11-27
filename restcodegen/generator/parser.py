@@ -18,11 +18,9 @@ from datamodel_code_generator.parser.openapi import (
 )
 
 from restcodegen.generator.log import LOGGER
-from restcodegen.generator.parser.types import BaseParameter, Handler, ParameterType
 from restcodegen.generator.utils import name_to_snake, rename_python_builtins, snake_to_camel
-
-if TYPE_CHECKING:
-    from restcodegen.generator.spec.loader import SpecLoader
+from pydantic import BaseModel, ConfigDict
+from restcodegen.generator.spec.loader import SpecLoader
 
 
 OPERATION_NAMES: set[str] = {"get", "put", "post", "delete", "patch", "head", "options", "trace"}
@@ -36,9 +34,6 @@ TYPE_MAP = {
     "object": "Any",
 }
 
-DEFAULT_HEADER_VALUE_MAP = {"int": 0, "float": 0.0, "str": "", "bool": True}
-
-
 @dataclass(slots=True)
 class ParsedOperation:
     path: str
@@ -48,6 +43,25 @@ class ParsedOperation:
     request_body: RequestBodyObject | None
     responses: dict[str, ResponseObject]
     raw_operation: dict[str, Any]
+
+
+class OperationContext(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    operation: Operation
+    method: str
+    path: str
+    raw_path: str
+    tags: list[str]
+    summary: str | None
+    operation_id: str
+    parameters: dict[str, list[dict[str, Any]]]
+    request_body_model: str | None
+    responses: dict[str, str]
+    success_response: str | None
+
+    def get(self, key: str, default: Any = None) -> Any:
+        return getattr(self, key, default)
 
 
 class Parser:
@@ -65,7 +79,6 @@ class Parser:
         self.version: str = ""
         self.description: str = ""
         self.openapi_version: str = ""
-        self.handlers: list[Handler] = []
         self._selected_tags: set[str] = set(selected_tags) if selected_tags else set()
         self.all_tags: set[str] = set()
         self.request_model_names: set[str] = set()
@@ -82,8 +95,6 @@ class Parser:
         selected_tags: list[str] | None = None,
         loader: SpecLoader | None = None,
     ) -> "Parser":
-        from restcodegen.generator.spec.loader import SpecLoader
-
         spec_loader = loader or SpecLoader(openapi_spec, package_name)
         spec = spec_loader.open()
         return cls(spec, package_name, selected_tags=selected_tags)
@@ -104,7 +115,7 @@ class Parser:
     def service_name(self) -> str:
         return self._service_name
 
-    def parse(self) -> list[Handler]:
+    def parse(self) -> list[ParsedOperation]:
         info = self.openapi_spec.get("info", {})
         self.version = info.get("version", "1.0.0")
         self.description = info.get("description", "")
@@ -118,27 +129,52 @@ class Parser:
 
         parser = self._init_openapi_parser()
         operations = self._collect_operations(parser)
-        handlers, tags, request_models, response_models = self._build_handlers(operations)
+        tags, request_models, response_models = self._collect_metadata(operations)
 
         self._operations = operations
-        self.handlers = handlers
         self.all_tags = tags
         self.request_model_names = request_models
         self.response_model_names = response_models
-        return self.handlers
+        return operations
 
     @property
     def operations(self) -> list[ParsedOperation]:
         return list(self._operations or [])
 
-    def handlers_by_tag(self, tag: str) -> list[Handler]:
-        return [h for h in self.handlers if tag in h.tags]
+    def get_operation_context(self, operation: ParsedOperation) -> OperationContext:
+        parameters = self._build_parameters(operation)
+        if not parameters["path"]:
+            parameters["path"] = self._fallback_path_parameters(operation.path)
 
-    def handlers_by_method(self, method: str) -> list[Handler]:
-        return [h for h in self.handlers if h.method == method]
+        responses = self._extract_response_models(operation.responses)
+        request_body_model = self._extract_request_body_model(operation)
+        success_response = self._get_success_response(responses)
 
-    def handler_by_path(self, path: str) -> list[Handler]:
-        return [h for h in self.handlers if h.path == path]
+        operation_id = operation.operation.operationId or self._generate_operation_id(operation)
+
+        return OperationContext(
+            operation=operation.operation,
+            method=operation.method,
+            path=self._normalize_path(operation.path),
+            raw_path=operation.path,
+            tags=operation.operation.tags or [],
+            summary=operation.operation.summary,
+            operation_id=operation_id,
+            parameters=parameters,
+            request_body_model=request_body_model,
+            responses=responses,
+            success_response=success_response,
+        )
+
+    def handlers_by_tag(self, tag: str) -> list[ParsedOperation]:
+        return [operation for operation in self.operations if tag in (operation.operation.tags or [])]
+
+    def handlers_by_method(self, method: str) -> list[ParsedOperation]:
+        return [operation for operation in self.operations if operation.method.lower() == method.lower()]
+
+    def handler_by_path(self, path: str) -> list[ParsedOperation]:
+        normalized = self._normalize_path(path)
+        return [operation for operation in self.operations if self._normalize_path(operation.path) == normalized]
 
     def request_models(self) -> set[str]:
         return set(self.request_model_names)
@@ -148,17 +184,17 @@ class Parser:
 
     def models_by_tag(self, tag: str) -> set[str]:
         models: set[str] = set()
-        for handler in self.handlers:
-            if tag in handler.tags:
-                if handler.request_body:
-                    models.add(handler.request_body)
-                if handler.responses:
-                    models.update(handler.responses.values())
-                for param_group in (handler.path_parameters, handler.query_parameters, handler.headers):
-                    if not param_group:
-                        continue
-                    for param in param_group:
-                        models.add(param.type)
+        for operation in self.operations:
+            if tag in (operation.operation.tags or []):
+                request_model = self._extract_request_body_model(operation)
+                if request_model:
+                    models.add(request_model)
+                responses = self._extract_response_models(operation.responses)
+                models.update(responses.values())
+                for parameter in operation.parameters:
+                    param_type = self._extract_parameter_type(parameter)
+                    if self._is_complex_type(param_type):
+                        models.add(param_type)
         return models
 
     def _init_openapi_parser(self) -> OpenAPIParser:
@@ -179,7 +215,8 @@ class Parser:
 
         return parser
 
-    def _collect_operations(self, parser: OpenAPIParser) -> list[ParsedOperation]:
+    @staticmethod
+    def _collect_operations(parser: OpenAPIParser) -> list[ParsedOperation]:
         operations: list[ParsedOperation] = []
         raw_paths: Dict[str, Dict[str, Any]] = parser.raw_obj.get("paths", {})  # type: ignore[assignment]
         for path, methods in raw_paths.items():
@@ -229,8 +266,7 @@ class Parser:
 
         return operations
 
-    def _build_handlers(self, operations: list[ParsedOperation]) -> tuple[list[Handler], set[str], set[str], set[str]]:
-        handlers: list[Handler] = []
+    def _collect_metadata(self, operations: list[ParsedOperation]) -> tuple[set[str], set[str], set[str]]:
         tags: set[str] = set()
         request_models: set[str] = set()
         response_models: set[str] = set()
@@ -244,25 +280,7 @@ class Parser:
             responses = self._extract_response_models(operation.responses)
             response_models.update(responses.values())
 
-            path_params, query_params, header_params = self._split_parameters(operation.parameters)
-            if not path_params:
-                path_params = self._extract_path_params_from_path(operation.path)
-
-            handler = Handler(
-                path=self._normalize_path(operation.path),
-                method=operation.method,
-                tags=operation.operation.tags or [],
-                summary=operation.operation.summary,
-                operation_id=operation.operation.operationId,
-                path_parameters=path_params,
-                query_parameters=query_params,
-                headers=header_params,
-                request_body=request_body_model,
-                responses=responses,
-            )
-            handlers.append(handler)
-
-        return handlers, tags, request_models, response_models
+        return tags, request_models, response_models
 
     @staticmethod
     def _normalize_path(path: str) -> str:
@@ -277,6 +295,8 @@ class Parser:
     @staticmethod
     def _extract_parameter_type(parameter: ParameterObject) -> str:
         schema = parameter.schema_
+        if schema and schema.ref:
+            return Parser._ref_to_model_name(schema.ref)
         if schema and schema.type:
             schema_type = schema.type.value if hasattr(schema.type, "value") else schema.type
             if isinstance(schema_type, list):
@@ -285,33 +305,17 @@ class Parser:
             if mapped:
                 return mapped
             return str(schema_type)
-        return "str"
+        return "Any"
 
-    @classmethod
-    def _build_parameter(cls, parameter: ParameterObject) -> BaseParameter:
-        in_location = ParameterType(parameter.in_.value if parameter.in_ else ParameterType.QUERY.value)
-        type_str = cls._extract_parameter_type(parameter)
-        default = DEFAULT_HEADER_VALUE_MAP.get(type_str)
-        if parameter.schema_ and parameter.schema_.default is not None:
-            default = parameter.schema_.default
-        return BaseParameter(
-            name=parameter.name or "param",
-            type_=type_str,
-            description=parameter.description or "",
-            required=parameter.required,
-            default=default if in_location == ParameterType.HEADER else None,
-        )
-
-    @staticmethod
-    def _extract_request_body_model(operation: ParsedOperation) -> str | None:
+    def _extract_request_body_model(self, operation: ParsedOperation) -> str | None:
         if not operation.request_body:
             return None
         for media in operation.request_body.content.values():
             schema = media.schema_
             if isinstance(schema, ReferenceObject):
-                return Parser._ref_to_model_name(schema.ref)
+                return self._ref_to_model_name(schema.ref)
             if schema and schema.ref:
-                return Parser._ref_to_model_name(schema.ref)
+                return self._ref_to_model_name(schema.ref)
         return None
 
     @staticmethod
@@ -332,37 +336,100 @@ class Parser:
         return result
 
     @staticmethod
-    def _extract_path_params_from_path(path: str) -> list[BaseParameter]:
-        params: list[BaseParameter] = []
-        for match in re.findall(r"\{([^}]+)\}", path):
-            normalized_name = rename_python_builtins(name_to_snake(match))
+    def _extract_parameter_location(parameter: ParameterObject) -> str:
+        if parameter.in_:
+            return parameter.in_.value
+        return "query"
+
+    def _build_parameters(self, operation: ParsedOperation) -> dict[str, list[dict[str, Any]]]:
+        path_params: list[dict[str, Any]] = []
+        query_params: list[dict[str, Any]] = []
+        header_params: list[dict[str, Any]] = []
+
+        for parameter in operation.parameters:
+            context = self._build_parameter_context(parameter)
+            location = context["location"]
+            if location == "path":
+                path_params.append(context)
+            elif location == "header":
+                header_params.append(context)
+            else:
+                query_params.append(context)
+
+        return {
+            "path": self._sort_parameters(path_params),
+            "query": self._sort_parameters(query_params),
+            "header": self._sort_parameters(header_params),
+        }
+
+    def _build_parameter_context(self, parameter: ParameterObject) -> dict[str, Any]:
+        name = parameter.name or "param"
+        python_name = rename_python_builtins(name_to_snake(name))
+        type_str = self._extract_parameter_type(parameter)
+        description = parameter.description or ""
+        default: Any | None = None
+        if parameter.schema_ and parameter.schema_.default is not None:
+            default = parameter.schema_.default
+        location = self._extract_parameter_location(parameter)
+
+        if not python_name:
+            fallback_source = f"{location}_{name}" if name else f"{location}_param"
+            python_name = rename_python_builtins(name_to_snake(fallback_source)) or f"{location}_param"
+
+        return {
+            "name": name,
+            "python_name": python_name,
+            "type": type_str,
+            "required": bool(parameter.required),
+            "description": description,
+            "default": default,
+            "location": location,
+        }
+
+    @staticmethod
+    def _sort_parameters(parameters: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        return sorted(parameters, key=lambda item: not item["required"])
+
+    @staticmethod
+    def _fallback_path_parameters(path: str) -> list[dict[str, Any]]:
+        params: list[dict[str, Any]] = []
+        for index, match in enumerate(re.findall(r"\{([^}]+)\}", path), start=1):
+            python_name = rename_python_builtins(name_to_snake(match))
+            if not python_name:
+                python_name = f"path_param_{index}"
             params.append(
-                BaseParameter(
-                    name=normalized_name,
-                    type_="str",
-                    description=f"Path parameter: {normalized_name}",
-                    required=True,
-                )
+                {
+                    "name": match,
+                    "python_name": python_name,
+                    "type": "str",
+                    "required": True,
+                    "description": f"Path parameter: {match}",
+                    "default": None,
+                    "location": "path",
+                }
             )
         return params
 
-    @classmethod
-    def _split_parameters(cls, parameters: list[ParameterObject]) -> Tuple[list[BaseParameter], list[BaseParameter], list[BaseParameter]]:
-        path_params: list[BaseParameter] = []
-        query_params: list[BaseParameter] = []
-        header_params: list[BaseParameter] = []
+    @staticmethod
+    def _get_success_response(responses: dict[str, str]) -> str | None:
+        for status in ("200", "201", "202"):
+            if status in responses:
+                return responses[status]
+        return None
 
-        for parameter in parameters:
-            built = cls._build_parameter(parameter)
-            location = parameter.in_.value if parameter.in_ else "query"
-            if location == ParameterType.PATH.value:
-                path_params.append(built)
-            elif location == ParameterType.HEADER.value:
-                header_params.append(built)
-            else:
-                query_params.append(built)
+    @staticmethod
+    def _generate_operation_id(operation: ParsedOperation) -> str:
+        normalized_path = Parser._normalize_path(operation.path).strip("/")
+        if normalized_path:
+            segments = [segment.replace("_", "__") for segment in normalized_path.split("/") if segment]
+            escaped_path = "_".join(segments) or "root"
+        else:
+            escaped_path = "root"
 
-        def sort_params(items: list[BaseParameter]) -> list[BaseParameter]:
-            return sorted(items, key=lambda param: not param.required)
+        candidate = f"{operation.method}_{escaped_path}"
+        return rename_python_builtins(name_to_snake(candidate))
 
-        return sort_params(path_params), sort_params(query_params), sort_params(header_params)
+    @staticmethod
+    def _is_complex_type(type_name: str) -> bool:
+        builtin_types = {"int", "float", "str", "bool", "list", "dict", "Any"}
+        return type_name not in builtin_types

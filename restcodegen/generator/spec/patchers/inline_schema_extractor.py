@@ -40,8 +40,13 @@ class InlineSchemaExtractor:
                 self.processed_schemas.add(schema_name)
 
     def _extract_inline_schemas_from_paths(self) -> None:
+        operation_names = {"get", "put", "post", "delete", "patch", "head", "options", "trace"}
+
         for path, methods in self.swagger_scheme.get("paths", {}).items():
             for method_name, method in methods.items():
+                if method_name.lower() not in operation_names or not isinstance(method, dict):
+                    continue
+
                 operation_id = method.get("operationId", f"{method_name}_{path.replace('/', '_')}")
                 self._process_request_body(method, operation_id)
                 self._process_responses(method, operation_id)
