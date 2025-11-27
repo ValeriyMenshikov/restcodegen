@@ -3,8 +3,8 @@ from pathlib import Path
 import pytest
 
 from restcodegen.generator.parser import Parser
-from restcodegen.generator.rest_codegen import RESTClientGenerator
-from restcodegen.generator.parameters import BaseParameter
+from restcodegen.generator.codegen import RESTClientGenerator
+from restcodegen.generator.parser.types import BaseParameter
 from restcodegen.generator.parser import Handler
 
 

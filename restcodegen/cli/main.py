@@ -1,7 +1,7 @@
 import click
 
 from restcodegen.generator.parser import Parser
-from restcodegen.generator.rest_codegen import RESTClientGenerator
+from restcodegen.generator.codegen import RESTClientGenerator
 from restcodegen.generator.utils import format_file
 
 
@@ -25,12 +25,11 @@ def cli() -> None: ...
     help="service name",
 )
 @click.option(
-    "--async-mode",
+    "--async",
     "-a",
-    required=False,
-    type=bool,
-    help="Async mode",
-    default=False,
+    "async_mode",
+    is_flag=True,
+    help="Enable async client generation",
 )
 @click.option(
     "--api-tags",
@@ -64,9 +63,9 @@ def generate_command(
     templates_dir: str | None,
     output_dir: str | None,
 ) -> None:
-    parser = Parser(
+    parser = Parser.from_source(
         openapi_spec=url,
-        service_name=service_name,
+        package_name=service_name,
         selected_tags=api_tags.split(",") if api_tags else None,
     )
     gen = RESTClientGenerator(

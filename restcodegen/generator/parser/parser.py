@@ -1,20 +1,23 @@
+from __future__ import annotations
+
 import re
 from pathlib import Path
-from typing import Any
-
-from pydantic import BaseModel, Field, HttpUrl
+from typing import TYPE_CHECKING, Any
 
 from restcodegen.generator.log import LOGGER
-from restcodegen.generator.parameters import (
+from restcodegen.generator.parser.types import (
     BaseParameter,
     ParameterType,
+    Handler,
 )
-from restcodegen.generator.spec_loader import SpecLoader
 from restcodegen.generator.utils import (
     name_to_snake,
     rename_python_builtins,
     snake_to_camel,
 )
+
+if TYPE_CHECKING:
+    from restcodegen.generator.spec.loader import SpecLoader
 
 TYPE_MAP = {
     "integer": "int",
@@ -30,48 +33,17 @@ TYPE_MAP = {
 DEFAULT_HEADER_VALUE_MAP = {"int": 0, "float": 0.0, "str": "", "bool": True}
 
 
-class Handler(BaseModel):
-    path: str = Field(...)
-    method: str = Field(...)
-    tags: list = Field(...)
-    summary: str | None = Field(None)
-    operation_id: str | None = Field(None)
-    path_parameters: list[BaseParameter] | None = Field(None)
-    query_parameters: list[BaseParameter] | None = Field(None)
-    headers: list[BaseParameter] | None = Field(None)
-    request_body: str | None = Field(None)
-    responses: dict | None = Field(None)
-
-    def get(self, key: str, default: Any = None) -> Any:
-        return getattr(self, key, default)
-
-
-class OpenApiSpec(BaseModel):
-    service_name: str = Field(...)
-    version: str = Field(...)
-    title: str = Field(...)
-    description: str = Field(...)
-    openapi_version: str = Field(...)
-    handlers: list[Handler]
-    request_models: set[str] = set()
-    response_models: set[str] = set()
-    api_tags: set[str] = set()
-    all_tags: set[str] = set()
-
-
 class Parser:
     BASE_PATH = Path.cwd() / "clients" / "http"
 
     def __init__(
         self,
-        openapi_spec: str | HttpUrl,
+        openapi_spec: dict[str, Any],
         service_name: str,
         selected_tags: list[str] | None = None,
     ) -> None:
-        self._spec_path = str(openapi_spec)
-
+        self.openapi_spec = openapi_spec
         self._service_name = service_name
-        self.openapi_spec: dict = SpecLoader(self._spec_path, self._service_name).open()
         self.version: str = ""
         self.description: str = ""
         self.openapi_version: str = ""
@@ -79,6 +51,21 @@ class Parser:
         self._selected_tags: set[str] = set(selected_tags) if selected_tags else set()
         self.all_tags: set[str] = set()
         self.parse()
+
+    @classmethod
+    def from_source(
+        cls,
+        openapi_spec: str,
+        package_name: str,
+        *,
+        selected_tags: list[str] | None = None,
+        loader: SpecLoader | None = None,
+    ) -> "Parser":
+        from restcodegen.generator.spec.loader import SpecLoader  # локальный импорт во избежание циклов
+
+        spec_loader = loader or SpecLoader(openapi_spec, package_name)
+        spec = spec_loader.open()
+        return cls(spec, package_name, selected_tags=selected_tags)
 
     @property
     def apis(self) -> set[str]:
@@ -101,11 +88,8 @@ class Parser:
     def service_name(self) -> str:
         return self._service_name
 
-    @property
-    def client_type(self) -> str:
-        return "http"
-
-    def _get_request_body(self, request_body: dict | list) -> str | None:
+    @staticmethod
+    def _get_request_body(request_body: dict | list) -> str | None:
         if isinstance(request_body, list):
             for parameter in request_body:
                 if parameter.get("in") == "body":

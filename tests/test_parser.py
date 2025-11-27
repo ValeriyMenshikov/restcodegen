@@ -1,51 +1,43 @@
 import json
 from pathlib import Path
-from unittest.mock import MagicMock, patch
-
 from restcodegen.generator.parser import Parser
 
 
-@patch("restcodegen.generator.spec_loader.SpecLoader.open")
-def test_parser_initialization(mock_spec_loader: MagicMock, sample_openapi_spec: dict) -> None:
+def test_parser_initialization(sample_openapi_spec: dict) -> None:
     """Test Parser initialization and parsing."""
-    mock_spec_loader.return_value = sample_openapi_spec
 
-    parser = Parser("http://example.com/openapi.json", "test_service")
+    parser = Parser(sample_openapi_spec, "test_service")
 
     assert parser.service_name == "test_service"
-    assert parser.client_type == "http"
     assert len(parser.all_tags) > 0
     assert "users" in parser.all_tags
     assert "posts" in parser.all_tags
 
 
-@patch("restcodegen.generator.spec_loader.SpecLoader.open")
-def test_apis_property(mock_spec_loader: MagicMock, sample_openapi_spec: dict) -> None:
+def test_apis_property(sample_openapi_spec: dict) -> None:
     """Test the apis property returns correct tags."""
-    mock_spec_loader.return_value = sample_openapi_spec
 
     # Test with no selected tags
-    parser = Parser("http://example.com/openapi.json", "test_service")
+    parser = Parser(sample_openapi_spec, "test_service")
     assert "users" in parser.apis
     assert "posts" in parser.apis
 
     # Test with selected tags
-    parser = Parser("http://example.com/openapi.json", "test_service", selected_tags=["users"])
+    parser = Parser(sample_openapi_spec, "test_service", selected_tags=["users"])
     assert "users" in parser.apis
     assert "posts" not in parser.apis
 
     # Test with non-existent tag
-    parser = Parser("http://example.com/openapi.json", "test_service", selected_tags=["nonexistent"])
+    parser = Parser(sample_openapi_spec, "test_service", selected_tags=["nonexistent"])
     assert "users" in parser.apis  # Should fall back to all tags
     assert "posts" in parser.apis
 
 
-@patch("restcodegen.generator.spec_loader.SpecLoader.open")
-def test_handlers_by_tag(mock_spec_loader: MagicMock, sample_openapi_spec: dict) -> None:
-    """Test handlers_by_tag returns correct handlers."""
-    mock_spec_loader.return_value = sample_openapi_spec
 
-    parser = Parser("http://example.com/openapi.json", "test_service")
+def test_handlers_by_tag(sample_openapi_spec: dict) -> None:
+    """Test handlers_by_tag returns correct handlers."""
+
+    parser = Parser(sample_openapi_spec, "test_service")
 
     # Check handlers for users tag
     users_handlers = parser.handlers_by_tag("users")
@@ -63,12 +55,11 @@ def test_handlers_by_tag(mock_spec_loader: MagicMock, sample_openapi_spec: dict)
     assert len(nonexistent_handlers) == 0
 
 
-@patch("restcodegen.generator.spec_loader.SpecLoader.open")
-def test_models_by_tag(mock_spec_loader: MagicMock, sample_openapi_spec: dict) -> None:
-    """Test models_by_tag returns correct models."""
-    mock_spec_loader.return_value = sample_openapi_spec
 
-    parser = Parser("http://example.com/openapi.json", "test_service")
+def test_models_by_tag(sample_openapi_spec: dict) -> None:
+    """Test models_by_tag returns correct models."""
+
+    parser = Parser(sample_openapi_spec, "test_service")
 
     # Check models for users tag
     users_models = parser.models_by_tag("users")
@@ -80,23 +71,21 @@ def test_models_by_tag(mock_spec_loader: MagicMock, sample_openapi_spec: dict) -
     assert "PostList" in posts_models
 
 
-@patch("restcodegen.generator.spec_loader.SpecLoader.open")
-def test_request_models(mock_spec_loader: MagicMock, sample_openapi_spec: dict) -> None:
-    """Test request_models returns correct models."""
-    mock_spec_loader.return_value = sample_openapi_spec
 
-    parser = Parser("http://example.com/openapi.json", "test_service")
+def test_request_models(sample_openapi_spec: dict) -> None:
+    """Test request_models returns correct models."""
+
+    parser = Parser(sample_openapi_spec, "test_service")
 
     request_models = parser.request_models()
     assert "User" in request_models
 
 
-@patch("restcodegen.generator.spec_loader.SpecLoader.open")
-def test_response_models(mock_spec_loader: MagicMock, sample_openapi_spec: dict) -> None:
-    """Test response_models returns correct models."""
-    mock_spec_loader.return_value = sample_openapi_spec
 
-    parser = Parser("http://example.com/openapi.json", "test_service")
+def test_response_models(sample_openapi_spec: dict) -> None:
+    """Test response_models returns correct models."""
+
+    parser = Parser(sample_openapi_spec, "test_service")
 
     response_models = parser.response_models()
     assert "User" in response_models
@@ -106,7 +95,7 @@ def test_response_models(mock_spec_loader: MagicMock, sample_openapi_spec: dict)
 
 def test_parser_with_remote_petstore_spec() -> None:
     """Integration test against the public Petstore specification."""
-    parser = Parser("https://petstore3.swagger.io/api/v3/openapi.json", "petstore")
+    parser = Parser.from_source("https://petstore3.swagger.io/api/v3/openapi.json", "petstore")
     assert parser.service_name == "petstore"
     assert parser.openapi_version.startswith("3.")
     assert "pet" in parser.apis
