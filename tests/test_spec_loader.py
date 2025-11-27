@@ -1,6 +1,6 @@
 import pytest
 
-from restcodegen.generator.spec_loader import SpecLoader
+from restcodegen.generator.spec.loader import SpecLoader
 
 
 @pytest.fixture

@@ -22,6 +22,7 @@ def name_to_snake(string: str) -> str:
             "/": "_",
             ".": "_",
             "-": "_",
+            "~": "_",
             "{": None,
             "}": None,
             "[": None,

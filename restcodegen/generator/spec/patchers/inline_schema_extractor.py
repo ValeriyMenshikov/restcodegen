@@ -1,54 +1,25 @@
+from __future__ import annotations
+
 import copy
-import json
 from typing import Any
 
 
-class SpecPatcher:
-    """
-    Class for patching a swagger scheme if it contains a dot in a schema name or not RequestBody,
-
-    responses, parameters etc.
-    """
+class InlineSchemaExtractor:
+    """Выносит inline-схемы из paths в components.schemas."""
 
     def __init__(self) -> None:
         self.swagger_scheme: dict[str, Any] = {}
-        self.processed_schemas: set = set()
+        self.processed_schemas: set[str] = set()
 
-    def patch(self, swagger_scheme: dict) -> dict:
+    def patch(self, swagger_scheme: dict[str, Any]) -> dict[str, Any]:
         self.swagger_scheme = copy.deepcopy(swagger_scheme)
         self._ensure_components_exist()
         self._extract_all_schemas()
-
-        json_content = json.dumps(self.swagger_scheme)
-        schemas_to_patch = self._get_schemas_to_patch()
-
-        for schema in schemas_to_patch:
-            for text in [f'/{schema}"', f'"{schema}"']:
-                json_content = json_content.replace(text, text.replace(".", ""))
-
-        return json.loads(json_content)
+        return self.swagger_scheme
 
     def _ensure_components_exist(self) -> None:
-        if "components" not in self.swagger_scheme:
-            self.swagger_scheme["components"] = {}
-        if "schemas" not in self.swagger_scheme["components"]:
-            self.swagger_scheme["components"]["schemas"] = {}
-
-    def _get_schemas_to_patch(self) -> list[str]:
-        schemas_to_patch = []
-
-        schemas = self.swagger_scheme.get("components", {}).get("schemas", {}) or self.swagger_scheme.get(
-            "definitions", {}
-        )
-        schemas_to_patch.extend([schema for schema in schemas if "." in schema])
-
-        for _, methods in self.swagger_scheme.get("paths", {}).items():
-            for _, method in methods.items():
-                for tag in method.get("tags", []):
-                    if "." in tag:
-                        schemas_to_patch.append(tag)
-
-        return schemas_to_patch
+        self.swagger_scheme.setdefault("components", {})
+        self.swagger_scheme["components"].setdefault("schemas", {})
 
     def _extract_all_schemas(self) -> None:
         self._extract_inline_schemas_from_paths()
@@ -69,8 +40,13 @@ class SpecPatcher:
                 self.processed_schemas.add(schema_name)
 
     def _extract_inline_schemas_from_paths(self) -> None:
+        operation_names = {"get", "put", "post", "delete", "patch", "head", "options", "trace"}
+
         for path, methods in self.swagger_scheme.get("paths", {}).items():
             for method_name, method in methods.items():
+                if method_name.lower() not in operation_names or not isinstance(method, dict):
+                    continue
+
                 operation_id = method.get("operationId", f"{method_name}_{path.replace('/', '_')}")
                 self._process_request_body(method, operation_id)
                 self._process_responses(method, operation_id)

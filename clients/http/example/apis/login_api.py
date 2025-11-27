@@ -15,8 +15,8 @@ from httpx import Client
 
 
 from clients.http.example.models.api_models import (
-    LoginCredentials,
     UserEnvelope,
+    LoginCredentials,
 )
 
 

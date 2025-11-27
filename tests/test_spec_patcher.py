@@ -1,7 +1,10 @@
 import json
 import pytest
 
-from restcodegen.generator.spec_patcher import SpecPatcher
+from restcodegen.generator.spec.patchers import (
+    ComponentSchemaPatcher,
+    InlineSchemaExtractor,
+)
 
 
 @pytest.fixture
@@ -181,8 +184,8 @@ def schema_with_combined_schemas() -> dict:
 
 def test_extract_inline_schemas(simple_swagger_schema: dict) -> None:
     """Test that inline schemas are extracted to components/schemas."""
-    patcher = SpecPatcher()
-    patched = patcher.patch(simple_swagger_schema)
+    extractor = InlineSchemaExtractor()
+    patched = extractor.patch(simple_swagger_schema)
 
     assert "components" in patched
     assert "schemas" in patched["components"]
@@ -201,8 +204,7 @@ def test_extract_inline_schemas(simple_swagger_schema: dict) -> None:
 
 def test_replace_dots_in_schema_names(schema_with_dots: dict) -> None:
     """Test that dots in schema names are replaced."""
-    patcher = SpecPatcher()
-    patched = patcher.patch(schema_with_dots)
+    patched = ComponentSchemaPatcher().patch(schema_with_dots)
 
     assert "User.Profile" not in patched["components"]["schemas"]
     assert "UserProfile" in patched["components"]["schemas"]
@@ -217,8 +219,7 @@ def test_replace_dots_in_schema_names(schema_with_dots: dict) -> None:
 
 def test_extract_nested_objects(schema_with_nested_objects: dict) -> None:
     """Test that nested objects are extracted to components/schemas."""
-    patcher = SpecPatcher()
-    patched = patcher.patch(schema_with_nested_objects)
+    patched = InlineSchemaExtractor().patch(schema_with_nested_objects)
 
     schemas = patched["components"]["schemas"]
     assert "create_user_request_body" in schemas
@@ -238,8 +239,7 @@ def test_extract_nested_objects(schema_with_nested_objects: dict) -> None:
 
 def test_extract_combined_schemas(schema_with_combined_schemas: dict) -> None:
     """Test that combined schemas (oneOf, anyOf, allOf) are extracted."""
-    patcher = SpecPatcher()
-    patched = patcher.patch(schema_with_combined_schemas)
+    patched = InlineSchemaExtractor().patch(schema_with_combined_schemas)
 
     schemas = patched["components"]["schemas"]
     assert "create_product_request_body" in schemas
@@ -258,9 +258,9 @@ def test_extract_combined_schemas(schema_with_combined_schemas: dict) -> None:
 
 def test_idempotent_patching(simple_swagger_schema: dict) -> None:
     """Test that patching an already patched schema doesn't change it further."""
-    patcher = SpecPatcher()
-    patched_once = patcher.patch(simple_swagger_schema)
-    patched_twice = patcher.patch(patched_once)
+    extractor = InlineSchemaExtractor()
+    patched_once = extractor.patch(simple_swagger_schema)
+    patched_twice = extractor.patch(patched_once)
 
     json_once = json.dumps(patched_once, sort_keys=True)
     json_twice = json.dumps(patched_twice, sort_keys=True)
