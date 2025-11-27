@@ -330,12 +330,17 @@ class Parser:
     def _extract_response_models(responses: dict[str, ResponseObject]) -> dict[str, str]:
         result: dict[str, str] = {}
         for status_code, response in responses.items():
+            status_str = str(status_code)
+            if not Parser._is_success_status(status_str):
+                continue
             for media in response.content.values():
                 schema = media.schema_
                 if isinstance(schema, ReferenceObject):
-                    result[status_code] = Parser._ref_to_model_name(schema.ref)
-                elif schema and schema.ref:
-                    result[status_code] = Parser._ref_to_model_name(schema.ref)
+                    result[status_str] = Parser._ref_to_model_name(schema.ref)
+                    break
+                if schema and schema.ref:
+                    result[status_str] = Parser._ref_to_model_name(schema.ref)
+                    break
         return result
 
     @staticmethod
@@ -419,6 +424,17 @@ class Parser:
             if status in responses:
                 return responses[status]
         return None
+
+    @staticmethod
+    def _is_success_status(status_code: str) -> bool:
+        if status_code.lower() == "default":
+            return False
+        normalized = status_code.upper()
+        if normalized.endswith("XX") and len(normalized) == 3 and normalized[0].isdigit():
+            normalized = normalized[0] + "00"
+        if not normalized.isdigit():
+            return False
+        return 200 <= int(normalized) < 300
 
     @staticmethod
     def _generate_operation_id(operation: ParsedOperation) -> str:
