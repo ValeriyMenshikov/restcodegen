@@ -6,8 +6,7 @@ from restcodegen.generator.spec.patchers import ComponentSchemaPatcher, InlineSc
 
 
 class SpecTransform(Protocol):
-    def patch(self, spec: dict[str, Any]) -> dict[str, Any]:
-        ...
+    def patch(self, spec: dict[str, Any]) -> dict[str, Any]: ...
 
 
 class SpecNormalizer:

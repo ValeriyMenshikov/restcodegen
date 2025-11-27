@@ -1,5 +1,3 @@
-import json
-from pathlib import Path
 from restcodegen.generator.parser import Parser
 
 
@@ -33,7 +31,6 @@ def test_apis_property(sample_openapi_spec: dict) -> None:
     assert "posts" in parser.apis
 
 
-
 def test_handlers_by_tag(sample_openapi_spec: dict) -> None:
     """Test handlers_by_tag returns correct handlers."""
 
@@ -55,7 +52,6 @@ def test_handlers_by_tag(sample_openapi_spec: dict) -> None:
     assert len(nonexistent_handlers) == 0
 
 
-
 def test_models_by_tag(sample_openapi_spec: dict) -> None:
     """Test models_by_tag returns correct models."""
 
@@ -71,7 +67,6 @@ def test_models_by_tag(sample_openapi_spec: dict) -> None:
     assert "PostList" in posts_models
 
 
-
 def test_request_models(sample_openapi_spec: dict) -> None:
     """Test request_models returns correct models."""
 
@@ -79,7 +74,6 @@ def test_request_models(sample_openapi_spec: dict) -> None:
 
     request_models = parser.request_models()
     assert "User" in request_models
-
 
 
 def test_response_models(sample_openapi_spec: dict) -> None:

@@ -5,7 +5,7 @@ import tempfile
 from dataclasses import dataclass
 import re
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, List, Tuple
+from typing import Any, Dict
 
 from datamodel_code_generator import OpenAPIScope, PythonVersion
 from datamodel_code_generator.parser.openapi import (
@@ -33,6 +33,7 @@ TYPE_MAP = {
     "array": "list",
     "object": "Any",
 }
+
 
 @dataclass(slots=True)
 class ParsedOperation:
@@ -106,7 +107,9 @@ class Parser:
 
         result_tags = {tag for tag in self._selected_tags if tag in self.all_tags}
         if not result_tags:
-            LOGGER.warning("Ни один из выбранных тегов не найден в спецификации. Будут использованы все доступные теги.")
+            LOGGER.warning(
+                "Ни один из выбранных тегов не найден в спецификации. Будут использованы все доступные теги."
+            )
             return self.all_tags
 
         return result_tags

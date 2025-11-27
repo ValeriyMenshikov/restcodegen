@@ -52,6 +52,8 @@ def sample_openapi_spec() -> dict:
             }
         },
     }
+
+
 def test_generate_creates_expected_files(tmp_output: Path, sample_openapi_spec: dict) -> None:
     parser = Parser(sample_openapi_spec, "Dummy")
     generator = RESTClientGenerator(
