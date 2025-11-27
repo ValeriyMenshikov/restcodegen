@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "restcodegen"
-version = "2.0.0"
+version = "2.0.1"
 description = "Tool for generating Python clients from OpenAPI specifications"
 authors = ["Menshikov Valeriy Sergeevich <valeriy.menshikov.1989@gmail.com>"]
 readme = "README.md"
